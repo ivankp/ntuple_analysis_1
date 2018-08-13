@@ -5,6 +5,8 @@
 #include <list>
 #include <regex>
 
+// #include <boost/optional.hpp>
+
 // #include <sqlite3.h>
 
 #include <TFile.h>
@@ -13,10 +15,11 @@
 #include <TTreeReaderValue.h>
 #include <TTreeReaderArray.h>
 
-#include "nlohmann_json.hpp"
+#include "nlohmann/json.hpp"
+// #include "nlohmann/boost_optional.hh"
+#include "nlohmann/std_regex.hh"
 
 #include "ivanp/string.hh"
-#include "ivanp/error.hh"
 #include "ivanp/root/tkey.hh"
 
 #include "float_or_double_reader.hh"
@@ -28,23 +31,16 @@
 using std::cout;
 using std::cerr;
 using std::endl;
-using std::get;
-
+using std::string;
+using std::vector;
+// using boost::optional;
 using ivanp::cat;
 
-namespace nlohmann {
-template <> struct adl_serializer<std::regex> {
-  static void from_json(const json& j, std::regex& re) {
-    re.assign(j.get<std::string>());
-  }
-};
-}
-
-template <typename Key>
-std::string opt_str(const nlohmann::json& json, const Key& key){
+template <typename T, typename Key>
+T opt(const nlohmann::json& json, const Key& key, T def={}){
   auto it = json.find(key);
   if (it!=json.end()) return *it;
-  return { };
+  return def;
 }
 
 int main(int argc, char* argv[]) {
@@ -66,21 +62,20 @@ int main(int argc, char* argv[]) {
 
   // Chain and friend input files ===================================
   std::list<TChain> chains;
-  std::vector<std::string> weights_names;
+  vector<string> weights_names;
   for (const auto& input : runcards["input"]) {
-    const auto info = opt_str(input,"info");
-    if (!info.empty()) // print info
-      cout << "\033[36mInfo\033[0m: " << info << endl;
+    const string info = opt<string>(input,"info");
+    if (!info.empty()) cout << "\033[36mInfo\033[0m: " << info << endl;
 
-    const bool getnentries = input["getnentries"];
+    const bool getnentries = opt<bool>(input,"getnentries",true);
 
     TChain* chain = nullptr;
-    auto tree_name = opt_str(input,"tree");
-    for (const std::string& file_glob : input["files"]) { // Chain input files
-      for (const auto& file_name : ivanp::glob(file_glob)) {
+    string tree_name = opt<string>(input,"tree");
+    for (const string& file_glob : input["files"]) { // Chain input files
+      for (const string& file_name : ivanp::glob(file_glob)) {
         if (!chain) {
           if (tree_name.empty()) {
-            std::vector<std::string> trees;
+            vector<string> trees;
             TFile file(file_name.c_str());
             for (const TKey& key : list_cast<TKey>(file.GetListOfKeys())) {
               const auto* key_class = TClass::GetClass(key.GetClassName(),true);
@@ -88,8 +83,11 @@ int main(int argc, char* argv[]) {
               if (key_class->InheritsFrom(TTree::Class()))
                 trees.emplace_back(key.GetName());
             }
-            if (trees.size()>1) throw ivanp::error(
-              "Multiple TTrees in file ",file_name,": ",ivanp::lcat(trees));
+            if (trees.size()>1) {
+              cerr << "\033[31mMultiple TTrees in file " << file_name
+                   << ": " << ivanp::lcat(trees) << "\033[0m" << endl;
+              return 1;
+            }
             tree_name = trees[0];
           }
           cout << "\033[36mTTree\033[0m: " << tree_name << '\n';
@@ -105,7 +103,7 @@ int main(int argc, char* argv[]) {
 
     auto weights = input.find("weights"); // Add weights
     if (weights!=input.end()) {
-      std::vector<std::regex> res = *weights;
+      vector<std::regex> res = *weights;
       for (const auto* b : *chain->GetListOfBranches()) {
         const char* bname = b->GetName();
         for (const auto& re : res)
@@ -116,7 +114,7 @@ int main(int argc, char* argv[]) {
       }
     }
 
-    if (chains.size()>1) // Friend the chains
+    if (chains.size() > 1) // Friend the chains
       chains.front().AddFriend(chain);
   }
   TChain& chain = chains.front();
@@ -129,14 +127,14 @@ int main(int argc, char* argv[]) {
           weights_names.emplace_back(def[i]);
           goto endloop;
         }
-    cout << "\033[31mCannot find weight branches\033[0m" << endl;
+    cerr << "\033[31mCannot find weight branches\033[0m" << endl;
     return 1;
     endloop: ;
   }
 
   TTreeReader reader(&chain);
 
-  std::vector<float_or_double_value_reader> _weights;
+  vector<float_or_double_value_reader> _weights;
   _weights.reserve(weights_names.size());
   cout << "\033[36mWeights\033[0m:\n";
   for (const auto& name : weights_names) { // Make weight readers
