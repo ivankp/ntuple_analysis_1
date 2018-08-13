@@ -16,6 +16,7 @@
 #include <TTreeReaderArray.h>
 
 #include "nlohmann/json.hpp"
+#include "nlohmann/print_value_t.hh"
 // #include "nlohmann/boost_optional.hh"
 #include "nlohmann/std_regex.hh"
 
@@ -103,7 +104,14 @@ int main(int argc, char* argv[]) {
 
     auto weights = input.find("weights"); // Add weights
     if (weights!=input.end()) {
-      vector<std::regex> res = *weights;
+      vector<std::regex> res;
+      if (weights->is_array()) res = weights->get<decltype(res)>();
+      else if (weights->is_string()) res.emplace_back(weights->get<string>());
+      else {
+        cerr << "\033[31mWrong \"weights\" value type ("
+             << weights->type() << ")\033[0m" << endl;
+        return 1;
+      }
       for (const auto* b : *chain->GetListOfBranches()) {
         const char* bname = b->GetName();
         for (const auto& re : res)
