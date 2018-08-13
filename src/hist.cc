@@ -4,26 +4,15 @@
 #include <vector>
 #include <list>
 #include <regex>
+#include <memory>
 
-// #include <boost/optional.hpp>
-
-// #include <sqlite3.h>
-
+#include <dlfcn.h>
+#include "analysis.hh"
 #include <TFile.h>
 #include <TChain.h>
-#include <TTreeReader.h>
-#include <TTreeReaderValue.h>
-#include <TTreeReaderArray.h>
-
-#include "nlohmann/json.hpp"
-#include "nlohmann/print_value_t.hh"
-// #include "nlohmann/boost_optional.hh"
-#include "nlohmann/std_regex.hh"
-
 #include "ivanp/string.hh"
 #include "ivanp/root/tkey.hh"
-
-#include "float_or_double_reader.hh"
+#include "ivanp/error.hh"
 #include "glob.hh"
 
 #define TEST(var) \
@@ -34,8 +23,36 @@ using std::cerr;
 using std::endl;
 using std::string;
 using std::vector;
-// using boost::optional;
 using ivanp::cat;
+
+class analysis_loader {
+  void *dl;
+  basic_analysis*(*make_analysis)(
+    nlohmann::json runcard,
+    TTreeReader& reader,
+    vector<float_or_double_value_reader>& weights
+  );
+
+public:
+  template <typename F>
+  void _dlsym(F& f, const char* name) {
+    f = (F) dlsym(dl,name);
+    if (const char *err = dlerror()) throw ivanp::error(
+      "cannot load symbol \'",name,"\': ",err);
+  }
+
+  ~analysis_loader() { dlclose(dl); }
+  analysis_loader(const char* filename): dl(dlopen(filename,RTLD_LAZY)) {
+    if (!dl) throw ivanp::error("cannot load analysis: ",dlerror());
+    _dlsym(make_analysis,"make_analysis");
+  }
+
+  template <typename... T>
+  std::unique_ptr<basic_analysis> operator()(T&&... x) const {
+    return std::unique_ptr<basic_analysis>(
+      make_analysis(std::forward<T>(x)...));
+  }
+};
 
 template <typename T, typename Key>
 T opt(const nlohmann::json& json, const Key& key, T def={}){
@@ -142,14 +159,16 @@ int main(int argc, char* argv[]) {
 
   TTreeReader reader(&chain);
 
-  vector<float_or_double_value_reader> _weights;
-  _weights.reserve(weights_names.size());
+  vector<float_or_double_value_reader> weights;
+  weights.reserve(weights_names.size());
   cout << "\033[36mWeights\033[0m:\n";
   for (const auto& name : weights_names) { // Make weight readers
     cout << "  " << name << endl;
-    _weights.emplace_back(reader,name.c_str());
+    weights.emplace_back(reader,name.c_str());
   }
 
   // Analysis =======================================================
-  // analysis ana(chain);
+  const analysis_loader loader(argv[1]);
+  const auto analysis = loader(runcards,reader,weights);
+
 }
