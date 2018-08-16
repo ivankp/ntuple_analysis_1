@@ -6,5 +6,6 @@
 !include/
 !src/
 !runcards/
+!analyses/
 
 **.swp

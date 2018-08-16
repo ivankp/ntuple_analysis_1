@@ -13,6 +13,7 @@
 #include "ivanp/string.hh"
 #include "ivanp/root/tkey.hh"
 #include "ivanp/error.hh"
+#include "ivanp/timed_counter.hh"
 #include "glob.hh"
 
 #define TEST(var) \
@@ -27,11 +28,7 @@ using ivanp::cat;
 
 class analysis_loader {
   void *dl;
-  basic_analysis*(*make_analysis)(
-    nlohmann::json runcard,
-    TTreeReader& reader,
-    vector<float_or_double_value_reader>& weights
-  );
+  analysis_base*(*make_analysis)(analysis_args&& args);
 
 public:
   template <typename F>
@@ -47,10 +44,8 @@ public:
     _dlsym(make_analysis,"make_analysis");
   }
 
-  template <typename... T>
-  std::unique_ptr<basic_analysis> operator()(T&&... x) const {
-    return std::unique_ptr<basic_analysis>(
-      make_analysis(std::forward<T>(x)...));
+  std::unique_ptr<analysis_base> operator()(analysis_args&& args) const {
+    return std::unique_ptr<analysis_base>( make_analysis(std::move(args)) );
   }
 };
 
@@ -145,11 +140,11 @@ int main(int argc, char* argv[]) {
   TChain& chain = chains.front();
 
   if (weights_names.empty()) { // Find default weights
-    const char* def[] = { "weight2", "weight" };
-    for (unsigned i=0, n=sizeof(def)/sizeof(*def); i<n; ++i)
+    const char* names[] = { "weight2", "weight" };
+    for (unsigned i=0, n=sizeof(names)/sizeof(*names); i<n; ++i)
       for (const auto* b : *chain.GetListOfBranches())
-        if (!strcmp(b->GetName(),def[i])) {
-          weights_names.emplace_back(def[i]);
+        if (!strcmp(b->GetName(),names[i])) {
+          weights_names.emplace_back(names[i]);
           goto endloop;
         }
     cerr << "\033[31mCannot find weight branches\033[0m" << endl;
@@ -159,16 +154,31 @@ int main(int argc, char* argv[]) {
 
   TTreeReader reader(&chain);
 
-  vector<float_or_double_value_reader> weights;
-  weights.reserve(weights_names.size());
+  vector<float_or_double_value_reader> _weights;
+  _weights.reserve(weights_names.size());
   cout << "\033[36mWeights\033[0m:\n";
   for (const auto& name : weights_names) { // Make weight readers
     cout << "  " << name << endl;
-    weights.emplace_back(reader,name.c_str());
+    _weights.emplace_back(reader,name.c_str());
+  }
+  vector<double> weights(_weights.size());
+
+  // Load Analysis ==================================================
+  const analysis_loader loader(argv[1]);
+  const auto analysis = loader({reader,weights,runcards["analysis"]});
+
+  // LOOP ===========================================================
+  using counter = ivanp::timed_counter<Long64_t>;
+  // TODO: fix counter
+  for (counter ent(reader.GetEntries(true)); reader.Next(); ++ent) {
+    for (unsigned i=_weights.size(); i--; ) // read weights
+      weights[i] = *_weights[i];
+
+    // TODO: add reweighting
+
+    analysis->event_loop();
   }
 
-  // Analysis =======================================================
-  const analysis_loader loader(argv[1]);
-  const auto analysis = loader(runcards,reader,weights);
-
+  // TODO: add weights names
+  analysis->write_output();
 }

@@ -8,5 +8,10 @@
   "tree": "t3",
   "weights": "weight.*",
   "getnentries": false
-}]
+}],
+"analysis": {
+  "jets": {
+    "cuts": { "pT": 30, "eta": 4.4 }
+  }
+}
 }
