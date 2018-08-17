@@ -37,11 +37,8 @@ using std::string;
 using std::vector;
 using ivanp::cat;
 
-template <typename T, typename Key>
-T opt(const nlohmann::json& json, const Key& key, T def={}){
-  auto it = json.find(key);
-  if (it!=json.end()) return *it;
-  return def;
+inline nlohmann::json::json_pointer operator "" _jp(const char* s, size_t n) {
+  return nlohmann::json::json_pointer(std::string(s,n));
 }
 
 #ifndef ANALYSIS
@@ -53,17 +50,17 @@ T opt(const nlohmann::json& json, const Key& key, T def={}){
 #undef ANALYSIS_GLOBAL
 
 int main(int argc, char* argv[]) {
-  if (argc<3 || std::any_of(argv+1,argv+argc,[](const char* arg){
+  if (argc<2 || std::any_of(argv+1,argv+argc,[](const char* arg){
     return !strcmp(arg,"-h") || !strcmp(arg,"--help");
   })) {
-    cout << "usage: " << argv[0] << " analysis.so runcard.json ..." << endl;
+    cout << "usage: " << argv[0] << " runcard.json ..." << endl;
     return 1;
   }
 
   // Read runcards ==================================================
   nlohmann::json runcards;
-  std::ifstream(argv[2]) >> runcards;
-  for (int i=3; i<argc; ++i) {
+  std::ifstream(argv[1]) >> runcards;
+  for (int i=2; i<argc; ++i) {
     nlohmann::json runcard;
     std::ifstream(argv[i]) >> runcard;
     runcards.merge_patch(runcard);
@@ -72,15 +69,15 @@ int main(int argc, char* argv[]) {
   // Chain and friend input files ===================================
   std::list<TChain> chains;
   vector<string> weights_names;
-  for (const auto& input : runcards["input"]) {
-    const string info = opt<string>(input,"info");
+  for (const auto& input : runcards.at("input")) {
+    const string info = input.value("info","");
     if (!info.empty()) cout << "\033[36mInfo\033[0m: " << info << endl;
 
-    const bool getnentries = opt<bool>(input,"getnentries",true);
+    const bool getnentries = input.value("getnentries",true);
 
     TChain* chain = nullptr;
-    string tree_name = opt<string>(input,"tree");
-    for (const string& file_glob : input["files"]) { // Chain input files
+    string tree_name = input.value("tree","");
+    for (const string& file_glob : input.at("files")) { // Chain input files
       for (const string& file_name : ivanp::glob(file_glob)) {
         if (!chain) {
           if (tree_name.empty()) {

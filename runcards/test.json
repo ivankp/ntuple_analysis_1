@@ -11,7 +11,8 @@
 }],
 "analysis": {
   "jets": {
-    "cuts": { "pT": 30, "eta": 4.4 }
+    "cuts": { "pT": 30, "eta": 4.4 },
+    "alg": [ "antikt", 0.4 ]
   }
 }
 }

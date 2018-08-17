@@ -82,26 +82,25 @@ for ( auto bo : *reader.GetTree()->GetListOfBranches() ) {
 }
 TTreeReaderValue<Int_t> _id1(reader,"id1"), _id2(reader,"id2");
 
-const auto& ana_conf = runcards["analysis"];
+const auto& conf = runcards.at("analysis");
 
-const auto& jets_conf = ana_conf["jets"];
-const int njets_required = opt(jets_conf,"N_required",-1);
-const double jet_pt_cut  = jets_conf["cuts"]["pT"];
-const double jet_eta_cut = jets_conf["cuts"]["eta"];
-const fj::JetDefinition jet_def = jets_conf["alg"];
+const unsigned njets_required = conf.value("/jets/N_required"_jp,0);
+const double jet_pt_cut  = conf.at("/jets/cuts/pT"_jp);
+const double jet_eta_cut = conf.at("/jets/cuts/eta"_jp);
+const fj::JetDefinition jet_def = conf.at("/jets/alg"_jp);
 
 fj::ClusterSequence::print_banner(); // get it out of the way
 cout << jet_def.description() << endl;
 cout << "Njets >= " << njets_required << endl;
 
-const std::string bfname = ana_conf["binning"];
+const std::string bfname = conf.at("binning");
 cout << "\033[36mBinning\033[0m: " << bfname << '\n' << endl;
 re_axes ra(bfname);
 
 // Define histograms ==============================================
 ivanp::binner<bin_t, std::tuple<ivanp::axis_spec<
-    ivanp::uniform_axis<int>,0,1
-  >>> h_Njets({njets_required+2u,0,njets_required+2});
+    ivanp::uniform_axis<unsigned>,0,1
+  >>> h_Njets({njets_required+2u,0,njets_required+2u});
 
 #define H_MACRO(_1,_2,_3,NAME,...) NAME
 #define h_(...) H_MACRO(__VA_ARGS__, h3_, h2_, h1_)(__VA_ARGS__)
@@ -183,7 +182,7 @@ std::sort( fj_jets.begin(), fj_jets.end(),
     return ( a.pt() > b.pt() );
   });
 // resulting number of jets
-const int njets = fj_jets.size();
+const unsigned njets = fj_jets.size();
 
 // Higgs decay or add photons -------------------------------------
 if (higgs) diphoton = Hdecay(*higgs,new_id);
