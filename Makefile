@@ -34,24 +34,23 @@ rpath_script := ldd $(shell root-config --libdir)/libTreePlayer.so \
   | sed -nr '/^(\/usr)?\/lib/!s/^/-Wl,-rpath=/p'
 ROOT_LDLIBS += $(shell $(rpath_script))
 
-ROOT_NOLIBS := $(shell sed 's/ -[lr][^ ]\+//g' <<< '$(ROOT_LDLIBS)')
-
-LDFLAGS += $(ROOT_LDFLAGS)
-
 SRCS := $(shell find -L src -type f -name '*$(EXT)')
 DEPS := $(patsubst src/%$(EXT),$(BLD)/%.d,$(SRCS))
 
 GREP_EXES := grep -rl '^ *int \+main *(' src --include='*$(EXT)'
-EXES := $(patsubst src%$(EXT),bin%,$(shell $(GREP_EXES)))
+EXES := $(patsubst src%$(EXT),bin%, \
+  $(shell $(GREP_EXES)) \
+  $(wildcard src/analyses/*$(EXT)))
 
-PO := $(BLD)/ivanp/program_options/program_options.o
+C_Higgs2diphoton := $(ROOT_CXXFLAGS)
 
-C_hist := $(ROOT_CXXFLAGS) #$(FJ_CXXFLAGS)
-L_hist := $(ROOT_LDLIBS) -lTreePlayer #$(FJ_LDLIBS)
+C_analyses/test := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS)
+L_analyses/test := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS)
 
 all: $(EXES)
 
-bin/hist: $(BLD)/glob.o
+bin/analyses/test: \
+  $(BLD)/ivanp/binner/re_axes.o $(BLD)/glob.o $(BLD)/Higgs2diphoton.o
 
 -include $(DEPS)
 
@@ -63,13 +62,10 @@ $(DEPS): $(BLD)/%.d: src/%$(EXT) | $(BLD)/$$(dir %)
 $(BLD)/%.o: | $(BLD)
 	$(CXX) $(CXXFLAGS) $(C_$*) -c $(filter %$(EXT),$^) -o $@
 
-bin/%: $(BLD)/%.o | bin
+bin/%: $(BLD)/%.o | $$(dir bin/%)
 	$(CXX) $(LDFLAGS) $(filter %.o,$^) -o $@ $(LDLIBS) $(L_$*)
 
-bin:
-	mkdir -p $@
-
-$(BLD)/%/:
+bin/%/ $(BLD)/%/:
 	mkdir -p $@
 
 endif

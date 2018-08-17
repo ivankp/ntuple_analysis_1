@@ -4,12 +4,20 @@
 #include <vector>
 #include <list>
 #include <regex>
-#include <memory>
 
-#include <dlfcn.h>
-#include "analysis.hh"
+#include <boost/optional.hpp>
+
 #include <TFile.h>
 #include <TChain.h>
+#include <TTreeReader.h>
+#include <TTreeReaderValue.h>
+#include <TTreeReaderArray.h>
+#include "float_or_double_reader.hh"
+
+#include "json/nlohmann.hpp"
+#include "json/print_value_t.hh"
+#include "json/std_regex.hh"
+
 #include "ivanp/string.hh"
 #include "ivanp/root/tkey.hh"
 #include "ivanp/error.hh"
@@ -19,6 +27,9 @@
 #define TEST(var) \
   std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;
 
+#define _STR(S) #S
+#define STR(S) _STR(S)
+
 using std::cout;
 using std::cerr;
 using std::endl;
@@ -26,35 +37,20 @@ using std::string;
 using std::vector;
 using ivanp::cat;
 
-class analysis_loader {
-  void *dl;
-  analysis_base*(*make_analysis)(analysis_args&& args);
-
-public:
-  template <typename F>
-  void _dlsym(F& f, const char* name) {
-    f = (F) dlsym(dl,name);
-    if (const char *err = dlerror()) throw ivanp::error(
-      "cannot load symbol \'",name,"\': ",err);
-  }
-
-  ~analysis_loader() { dlclose(dl); }
-  analysis_loader(const char* filename): dl(dlopen(filename,RTLD_LAZY)) {
-    if (!dl) throw ivanp::error("cannot load analysis: ",dlerror());
-    _dlsym(make_analysis,"make_analysis");
-  }
-
-  std::unique_ptr<analysis_base> operator()(analysis_args&& args) const {
-    return std::unique_ptr<analysis_base>( make_analysis(std::move(args)) );
-  }
-};
-
 template <typename T, typename Key>
 T opt(const nlohmann::json& json, const Key& key, T def={}){
   auto it = json.find(key);
   if (it!=json.end()) return *it;
   return def;
 }
+
+#ifndef ANALYSIS
+#error "ANALYSIS is not defined"
+#endif
+
+#define ANALYSIS_GLOBAL
+#include STR(ANALYSIS)
+#undef ANALYSIS_GLOBAL
 
 int main(int argc, char* argv[]) {
   if (argc<3 || std::any_of(argv+1,argv+argc,[](const char* arg){
@@ -161,24 +157,25 @@ int main(int argc, char* argv[]) {
     cout << "  " << name << endl;
     _weights.emplace_back(reader,name.c_str());
   }
-  vector<double> weights(_weights.size());
 
-  // Load Analysis ==================================================
-  const analysis_loader loader(argv[1]);
-  const auto analysis = loader({reader,weights,runcards["analysis"]});
+#define ANALYSIS_INIT
+#include STR(ANALYSIS)
+#undef ANALYSIS_INIT
 
   // LOOP ===========================================================
   using counter = ivanp::timed_counter<Long64_t>;
   // TODO: fix counter
   for (counter ent(reader.GetEntries(true)); reader.Next(); ++ent) {
-    for (unsigned i=_weights.size(); i--; ) // read weights
-      weights[i] = *_weights[i];
 
     // TODO: add reweighting
 
-    analysis->event_loop();
+#define ANALYSIS_LOOP
+#include STR(ANALYSIS)
+#undef ANALYSIS_LOOP
+
   }
 
-  // TODO: add weights names
-  analysis->write_output();
+#define ANALYSIS_END
+#include STR(ANALYSIS)
+#undef ANALYSIS_END
 }
