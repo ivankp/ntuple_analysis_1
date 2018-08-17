@@ -7,12 +7,14 @@
   ],
   "tree": "t3",
   "weights": "weight.*",
-  "getnentries": false
+  "getnentries": true
 }],
 "analysis": {
   "jets": {
     "cuts": { "pT": 30, "eta": 4.4 },
-    "alg": [ "antikt", 0.4 ]
-  }
+    "alg": [ "antikt", 0.4 ],
+    "N_required": 1
+  },
+  "binning": "/home/ivanp/work/ntuple_analysis/runcards/Hjets.bins"
 }
 }

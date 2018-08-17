@@ -83,24 +83,18 @@ for ( auto bo : *reader.GetTree()->GetListOfBranches() ) {
 TTreeReaderValue<Int_t> _id1(reader,"id1"), _id2(reader,"id2");
 
 const auto& conf = runcards.at("analysis");
-
 const unsigned njets_required = conf.value("/jets/N_required"_jp,0);
-const double jet_pt_cut  = conf.at("/jets/cuts/pT"_jp);
-const double jet_eta_cut = conf.at("/jets/cuts/eta"_jp);
-const fj::JetDefinition jet_def = conf.at("/jets/alg"_jp);
-
-fj::ClusterSequence::print_banner(); // get it out of the way
-cout << jet_def.description() << endl;
-cout << "Njets >= " << njets_required << endl;
 
 const std::string bfname = conf.at("binning");
 cout << "\033[36mBinning\033[0m: " << bfname << '\n' << endl;
 re_axes ra(bfname);
 
 // Define histograms ==============================================
+bin_t::weights.resize(_weights.size());
+
 ivanp::binner<bin_t, std::tuple<ivanp::axis_spec<
-    ivanp::uniform_axis<unsigned>,0,1
-  >>> h_Njets({njets_required+2u,0,njets_required+2u});
+    ivanp::uniform_axis<int>,0,1
+  >>> h_Njets({njets_required+1u,0,(int)njets_required+1});
 
 #define H_MACRO(_1,_2,_3,NAME,...) NAME
 #define h_(...) H_MACRO(__VA_ARGS__, h3_, h2_, h1_)(__VA_ARGS__)
@@ -119,6 +113,14 @@ ivanp::binner<bin_t, std::tuple<ivanp::axis_spec<
 #define HIST_HJ_INIT
 #include STR(HIST_HJ)
 #undef HIST_HJ_INIT
+
+const double jet_pt_cut  = conf.at("/jets/cuts/pT"_jp);
+const double jet_eta_cut = conf.at("/jets/cuts/eta"_jp);
+const fj::JetDefinition jet_def = conf.at("/jets/alg"_jp);
+
+fj::ClusterSequence::print_banner(); // get it out of the way
+cout << jet_def.description() << endl;
+cout << "\033[36mNjets\033[0m >= " << njets_required << endl;
 
 Int_t prev_id = -1;
 size_t ncount_total = 0, num_events = 0;
@@ -144,7 +146,7 @@ nlo_bin::current_id = *_id;
 const bool new_id = (prev_id != nlo_bin::current_id);
 if (new_id) {
   prev_id = nlo_bin::current_id;
-  ncount_total += ( _ncount ? **_ncount : 1);
+  ncount_total += (_ncount ? **_ncount : 1);
   ++num_events;
 }
 
