@@ -160,9 +160,14 @@ int main(int argc, char* argv[]) {
 #undef ANALYSIS_INIT
 
   // LOOP ===========================================================
+  // const std::array<Long64_t,2> input_range =
+  //   runcards.value("input_range",{0,0});
+  // if (input_range[0]) reader.SetEntry(input_range[0]);
+  // if (input_range[1]) reader.SetEntry(input_range[1]);
   using counter = ivanp::timed_counter<Long64_t>;
   // TODO: fix counter
   for (counter ent(reader.GetEntries(true)); reader.Next(); ++ent) {
+    if (ent > 10) break;
 
     // TODO: add reweighting
 

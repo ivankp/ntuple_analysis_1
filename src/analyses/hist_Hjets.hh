@@ -20,6 +20,8 @@
 #include "ivanp/container.hh"
 
 #include "json/JetAlgorithm.hh"
+#include "json/binner.hh"
+#include "json/bins.hh"
 
 #include "Higgs2diphoton.hh"
 
@@ -220,7 +222,16 @@ if (njets < njets_required) continue;
 #endif
 #ifdef ANALYSIS_END // ==============================================
 
+nlohmann::json out;
 
+out["Njets_excl"] = h_Njets;
+// for (const auto& h : hist<1    >::all) out[h.name] = *h;
+// for (const auto& h : hist<1,0  >::all) out[h.name] = *h;
+// for (const auto& h : hist<1,0,0>::all) out[h.name] = *h;
+
+const string ofname = runcards["output"];
+cout << "\033[36mWriting output\033[0m: " << ofname << endl;
+std::ofstream(ofname) << out;
 
 #endif
 
