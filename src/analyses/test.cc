@@ -8,16 +8,24 @@
 #endif
 #ifdef HIST_HJ_INIT // =================================================
 
-h_(AA_dR)
+h_(HT) h_(H_pT) h_(H_y) h_(H_eta) h_(H_phi) h_(H_mass)
 
 #endif
 #ifdef HIST_HJ_LOOP // =================================================
 
-const double HM = higgs->M();
-if (HM<121) continue;
-if (HM>129) continue;
+if (njets < njets_required) continue;
 
-h_AA_dR(A1->DeltaR(*A2));
+const double H_pT = higgs->Pt();
+h_H_pT(H_pT);
+
+double HT = H_pT;
+for (const auto& jet : fj_jets) HT += jet.pt();
+h_HT(HT);
+
+h_H_y(higgs->Rapidity());
+h_H_eta(higgs->Eta());
+h_H_phi(higgs->Phi());
+h_H_mass(higgs->M());
 
 #endif
 

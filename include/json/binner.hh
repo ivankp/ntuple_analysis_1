@@ -12,7 +12,7 @@ private:
 
   template <unsigned I = sizeof...(Ax)-1>
   static inline std::enable_if_t<I!=0>
-  write(json& j, ii_t&& ii, const hist& h) {
+  write(json& j, ii_t& ii, const hist& h) {
     using spec = typename hist::template axis_spec<I>;
     const i_t n = std::get<I>(h.axes()).nbins() + spec::under::value;
     for (i_t& i = std::get<I>(ii) = 0; i<=n; ++i) {
@@ -23,20 +23,20 @@ private:
   }
   template <unsigned I = sizeof...(Ax)-1>
   static inline std::enable_if_t<I==0>
-  write(json& j, ii_t&& ii, const hist& h) {
+  write(json& j, ii_t& ii, const hist& h) {
     using spec = typename hist::template axis_spec<I>;
     const i_t n = std::get<I>(h.axes()).nbins() + spec::under::value;
     for (i_t& i = std::get<I>(ii) = 0; i<=n; ++i) {
       if (i==0 && !spec::under::value) j[i] = nullptr; else
       if (i==n && !spec::over ::value) j[i] = nullptr; else
       j[i] = h[ii];
-      // j[i] = "*";
     }
   }
 public:
   static void to_json(json& j, const hist& h) {
     j["axes"] = h.axes();
-    write(j["bins"],{},h);
+    ii_t ii { };
+    write(j["bins"],ii,h);
   }
 };
 
@@ -52,6 +52,18 @@ struct adl_serializer<ivanp::uniform_axis<T,Inherit>> {
   static void to_json(json& j, const ivanp::uniform_axis<T,Inherit>& axis) {
     j["nbins"] = axis.nbins();
     j["range"] = { axis.min(), axis.max() };
+  }
+};
+
+template <typename T, typename Ref, bool Inherit>
+struct adl_serializer<ivanp::ref_axis<T,Ref,Inherit>> {
+  static void to_json(json& j, const ivanp::ref_axis<T,Ref,Inherit>& axis) {
+    if (axis.is_uniform()) {
+      j["nbins"] = axis.nbins();
+      j["range"] = { axis.min(), axis.max() };
+    } else {
+      j = vector_of_edges(axis);
+    }
   }
 };
 

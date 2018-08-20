@@ -212,9 +212,6 @@ cat_bin::id<photon_cuts>()
 // Fill Histograms ------------------------------------------------
 h_Njets.fill_bin(njets);
 
-// kinematic distributions must have at least N jets
-if (njets < njets_required) continue;
-
 #define HIST_HJ_LOOP
 #include STR(HIST_HJ)
 #undef HIST_HJ_LOOP
@@ -224,10 +221,18 @@ if (njets < njets_required) continue;
 
 nlohmann::json out;
 
-out["Njets_excl"] = h_Njets;
-// for (const auto& h : hist<1    >::all) out[h.name] = *h;
-// for (const auto& h : hist<1,0  >::all) out[h.name] = *h;
-// for (const auto& h : hist<1,0,0>::all) out[h.name] = *h;
+#define CATEGORY_ANN(r, data, elem) \
+  ann_bins.push_back({STR(elem),enum_traits<elem>::all_str()});
+
+auto& ann_bins = out["annotation"]["bins"];
+ann_bins.push_back({"weight",weights_names});
+BOOST_PP_SEQ_FOR_EACH(CATEGORY_ANN,,CATEGORIES)
+ann_bins.push_back({"bin",{"w","w2","n"}});
+
+auto& hists = out["histograms"];
+hists["Njets_excl"] = h_Njets;
+for (const auto& h : hist<1  >::all) hists[h.name] = *h;
+for (const auto& h : hist<1,0>::all) hists[h.name] = *h;
 
 const string ofname = runcards["output"];
 cout << "\033[36mWriting output\033[0m: " << ofname << endl;

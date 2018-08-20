@@ -167,7 +167,6 @@ int main(int argc, char* argv[]) {
   using counter = ivanp::timed_counter<Long64_t>;
   // TODO: fix counter
   for (counter ent(reader.GetEntries(true)); reader.Next(); ++ent) {
-    if (ent > 10) break;
 
     // TODO: add reweighting
 
