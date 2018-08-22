@@ -45,12 +45,13 @@ EXES := $(patsubst src%$(EXT),bin%, \
 C_Higgs2diphoton := $(ROOT_CXXFLAGS)
 
 C_analyses/test := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS)
-L_analyses/test := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS)
+L_analyses/test := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) -llzma
 
 all: $(EXES)
 
 bin/analyses/test: \
-  $(BLD)/ivanp/binner/re_axes.o $(BLD)/glob.o $(BLD)/Higgs2diphoton.o
+  $(BLD)/ivanp/binner/re_axes.o $(BLD)/glob.o $(BLD)/Higgs2diphoton.o \
+  $(BLD)/lzma_compress.o
 
 -include $(DEPS)
 

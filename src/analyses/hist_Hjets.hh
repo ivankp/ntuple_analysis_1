@@ -22,6 +22,7 @@
 #include "json/JetAlgorithm.hh"
 #include "json/binner.hh"
 #include "json/bins.hh"
+#include "lzma_compress.hh"
 
 #include "Higgs2diphoton.hh"
 
@@ -220,11 +221,14 @@ h_Njets.fill_bin(njets);
 #ifdef ANALYSIS_END // ==============================================
 
 nlohmann::json out;
+auto& ann = out["annotation"];
+
+ann["runcard"] = runcards;
 
 #define CATEGORY_ANN(r, data, elem) \
   ann_bins.push_back({STR(elem),enum_traits<elem>::all_str()});
 
-auto& ann_bins = out["annotation"]["bins"];
+auto& ann_bins = ann["bins"];
 ann_bins.push_back({"weight",weights_names});
 BOOST_PP_SEQ_FOR_EACH(CATEGORY_ANN,,CATEGORIES)
 ann_bins.push_back({"bin",{"w","w2","n"}});
@@ -236,7 +240,10 @@ for (const auto& h : hist<1,0>::all) hists[h.name] = *h;
 
 const string ofname = runcards["output"];
 cout << "\033[36mWriting output\033[0m: " << ofname << endl;
-std::ofstream(ofname) << out;
+
+if (ofname.substr(ofname.size()-3) == ".xz") {
+  std::ofstream(ofname) << lzma_compress(out.dump(),6);
+} else std::ofstream(ofname) << out;
 
 #endif
 

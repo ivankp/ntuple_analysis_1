@@ -1,0 +1,17 @@
+universe = vanilla
+
+executable = ../job.sh
+arguments = $(card)
+
+name1 = $Fn(card)
+name  = $SUBSTR(name1,0,-5)
+output = $(name).out
+error  = $(name).err
+log    = $(name).log
+
+getenv = True
+
+# +IsLongJob = true
+
+queue card matching *_card.json
+

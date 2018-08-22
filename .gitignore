@@ -7,4 +7,10 @@
 !src/
 !runcards/
 
+!sql/
+sql/*.db
+
+!run/
+run/Hjets
+
 **.swp
