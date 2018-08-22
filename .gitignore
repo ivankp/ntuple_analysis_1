@@ -7,7 +7,7 @@
 !src/
 !runcards/
 
-!sql/
+!sql/*/
 sql/*.db
 
 !run/

@@ -22,7 +22,9 @@
 #include "ivanp/root/tkey.hh"
 #include "ivanp/error.hh"
 #include "ivanp/timed_counter.hh"
+#include "ivanp/program_options.hh"
 #include "glob.hh"
+#include "copy_file.hh"
 
 #define TEST(var) \
   std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;
@@ -37,6 +39,18 @@ using std::string;
 using std::vector;
 using ivanp::cat;
 
+#include <cstdio>
+class tmp_file_wrap {
+  string fname;
+public:
+  template <typename... T>
+  tmp_file_wrap(T&&... x): fname(std::forward<T>(x)...) { }
+  ~tmp_file_wrap() {
+    if (remove(fname.c_str()))
+      perror(("\033[31mError deleting file\033[31m \""+fname+"\"").c_str());
+  }
+};
+
 inline nlohmann::json::json_pointer operator "" _jp(const char* s, size_t n) {
   return nlohmann::json::json_pointer(std::string(s,n));
 }
@@ -50,23 +64,33 @@ inline nlohmann::json::json_pointer operator "" _jp(const char* s, size_t n) {
 #undef ANALYSIS_GLOBAL
 
 int main(int argc, char* argv[]) {
-  if (argc<2 || std::any_of(argv+1,argv+argc,[](const char* arg){
-    return !strcmp(arg,"-h") || !strcmp(arg,"--help");
-  })) {
-    cout << "usage: " << argv[0] << " runcard.json ..." << endl;
+  std::vector<const char*> ifnames;
+  std::string tmp_dir;
+
+  try {
+    using namespace ivanp::po;
+    if (program_options()
+      (ifnames,'i',"json runcards",req(),pos())
+      (tmp_dir,"--tmp-dir","copy input ntuples to temporary directory")
+      .parse(argc,argv,true)) return 0;
+    if (!tmp_dir.empty() && tmp_dir.back()!='/') tmp_dir += '/';
+  } catch (const std::exception& e) {
+    cerr << "\033[31m" << e.what() << "\033[0m" << endl;
     return 1;
   }
+  // ================================================================
 
   // Read runcards ==================================================
   nlohmann::json runcards;
-  std::ifstream(argv[1]) >> runcards;
-  for (int i=2; i<argc; ++i) {
+  std::ifstream(ifnames[0]) >> runcards;
+  for (const char* ifname : ifnames) {
     nlohmann::json runcard;
-    std::ifstream(argv[i]) >> runcard;
+    std::ifstream(ifname) >> runcard;
     runcards.merge_patch(runcard);
   }
 
   // Chain and friend input files ===================================
+  vector<tmp_file_wrap> tmp_files;
   std::list<TChain> chains;
   vector<string> weights_names;
   for (const auto& input : runcards.at("input")) {
@@ -78,7 +102,31 @@ int main(int argc, char* argv[]) {
     TChain* chain = nullptr;
     string tree_name = input.value("tree","");
     for (const string& file_glob : input.at("files")) { // Chain input files
-      for (const string& file_name : ivanp::glob(file_glob)) {
+      for (string file_name : ivanp::glob(file_glob)) {
+        if (file_name.empty() || file_name.back()=='/') {
+          cerr << "\033[31mBad file_name\033[0m: \""
+               << file_name << "\"" << endl;
+          return 1;
+        }
+        if (!tmp_dir.empty()) {
+          const string tmp_file_name = tmp_dir + string(
+            std::find(file_name.rbegin(), file_name.rend(), '/').base(),
+            file_name.end());
+          {
+            cout << "\033[36mCopying\033[0m: " << file_name
+                 << " -> " << tmp_file_name;
+            using namespace std::chrono;
+            using clock = high_resolution_clock;
+            clock::time_point t1 = clock::now();
+            copy_file(file_name.c_str(), tmp_file_name.c_str());
+            clock::time_point t2 = clock::now();
+            cout << cat(std::setprecision(2),std::fixed,
+                " (", duration_cast<duration<float>>(t2-t1).count(), " sec)"
+              ) << endl;
+          }
+          tmp_files.emplace_back(tmp_file_name);
+          file_name = std::move(tmp_file_name);
+        }
         if (!chain) {
           if (tree_name.empty()) {
             vector<string> trees;
