@@ -2,13 +2,12 @@
 "input": [{
   "info": "ntuples",
   "files": [
-    "/msu/data/t3work4/luisonig/H1jets_ggf/NTuplesFiles/H1.0j_GGFHT_B_6500_pt25.0_eta4.5_r100_100.root"
+    "/msu/data/t3work4/luisonig/H1jets_ggf/NTuplesFiles/H1.0j_GGFHT_B_6500_pt25.0_eta4.5_r100_10{0,1}.root"
   ],
   "tree": "t3",
-  "weights": "weight.*",
-  "getnentries": true
+  "weights": "weight.*"
 }],
-"input_range": [0,0],
+"entry_range": [0,0],
 "analysis": {
   "jets": {
     "cuts": { "pT": 30, "eta": 4.4 },

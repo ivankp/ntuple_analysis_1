@@ -40,14 +40,17 @@ using std::vector;
 using ivanp::cat;
 
 #include <cstdio>
-class tmp_file_wrap {
+#include <boost/core/noncopyable.hpp>
+class tmp_file_wrap: private boost::noncopyable {
   string fname;
 public:
+  tmp_file_wrap(tmp_file_wrap&& x): fname(std::move(x.fname)) { }
   template <typename... T>
   tmp_file_wrap(T&&... x): fname(std::forward<T>(x)...) { }
   ~tmp_file_wrap() {
-    if (remove(fname.c_str()))
-      perror(("\033[31mError deleting file\033[31m \""+fname+"\"").c_str());
+    if (!fname.empty())
+      if (remove(fname.c_str()))
+        perror(("\033[31mError deleting file\033[31m \""+fname+"\"").c_str());
   }
 };
 
@@ -64,13 +67,13 @@ inline nlohmann::json::json_pointer operator "" _jp(const char* s, size_t n) {
 #undef ANALYSIS_GLOBAL
 
 int main(int argc, char* argv[]) {
-  std::vector<const char*> ifnames;
+  std::vector<const char*> card_names;
   std::string tmp_dir;
 
   try {
     using namespace ivanp::po;
     if (program_options()
-      (ifnames,'i',"json runcards",req(),pos())
+      (card_names,'i',"json runcards",req(),pos())
       (tmp_dir,"--tmp-dir","copy input ntuples to temporary directory")
       .parse(argc,argv,true)) return 0;
     if (!tmp_dir.empty() && tmp_dir.back()!='/') tmp_dir += '/';
@@ -82,48 +85,49 @@ int main(int argc, char* argv[]) {
 
   // Read runcards ==================================================
   nlohmann::json runcards;
-  std::ifstream(ifnames[0]) >> runcards;
-  for (const char* ifname : ifnames) {
+  std::ifstream(card_names[0]) >> runcards;
+  for (const auto& card_name : card_names) {
     nlohmann::json runcard;
-    std::ifstream(ifname) >> runcard;
+    std::ifstream(card_name) >> runcard;
     runcards.merge_patch(runcard);
   }
 
   // Chain and friend input files ===================================
-  vector<tmp_file_wrap> tmp_files;
+  std::list<tmp_file_wrap> tmp_files;
   std::list<TChain> chains;
   vector<string> weights_names;
   for (const auto& input : runcards.at("input")) {
     const string info = input.value("info","");
     if (!info.empty()) cout << "\033[36mInfo\033[0m: " << info << endl;
 
-    const bool getnentries = input.value("getnentries",true);
+    // const bool getnentries = input.value("getnentries",true);
 
     TChain* chain = nullptr;
     string tree_name = input.value("tree","");
     for (const string& file_glob : input.at("files")) { // Chain input files
-      for (string file_name : ivanp::glob(file_glob)) {
+      for (string& file_name : ivanp::glob(file_glob)) {
         if (file_name.empty() || file_name.back()=='/') {
           cerr << "\033[31mBad file_name\033[0m: \""
                << file_name << "\"" << endl;
           return 1;
         }
-        if (!tmp_dir.empty()) {
-          const string tmp_file_name = tmp_dir + string(
+        if (!tmp_dir.empty()) { // copy input files to tmp_dir
+          string tmp_file_name = tmp_dir + string(
             std::find(file_name.rbegin(), file_name.rend(), '/').base(),
             file_name.end());
-          {
-            cout << "\033[36mCopying\033[0m: " << file_name
-                 << " -> " << tmp_file_name;
-            using namespace std::chrono;
-            using clock = high_resolution_clock;
-            clock::time_point t1 = clock::now();
-            copy_file(file_name.c_str(), tmp_file_name.c_str());
-            clock::time_point t2 = clock::now();
-            cout << cat(std::setprecision(2),std::fixed,
-                " (", duration_cast<duration<float>>(t2-t1).count(), " sec)"
-              ) << endl;
-          }
+
+          cout << "\033[36mCopying\033[0m: "
+               << file_name << " -> " << tmp_file_name;
+          using namespace std::chrono;
+          using clock = high_resolution_clock;
+          clock::time_point t1 = clock::now();
+          copy_file(file_name.c_str(), tmp_file_name.c_str());
+          // system(cat("cp -v ",file_name,' ',tmp_file_name).c_str());
+          clock::time_point t2 = clock::now();
+          cout << cat(std::setprecision(2),std::fixed,
+              " (", duration_cast<duration<float>>(t2-t1).count(), " sec)"
+            ) << endl;
+
           tmp_files.emplace_back(tmp_file_name);
           file_name = std::move(tmp_file_name);
         }
@@ -149,8 +153,7 @@ int main(int argc, char* argv[]) {
           chains.emplace_back(tree_name.c_str());
           chain = &chains.back();
         }
-        if (!chain->Add(file_name.c_str(),getnentries?0:TTree::kMaxEntries))
-          return 1;
+        if (!chain->Add(file_name.c_str(),0)) return 1;
         cout << "  " << file_name << endl;
       }
     }
@@ -208,13 +211,15 @@ int main(int argc, char* argv[]) {
 #undef ANALYSIS_INIT
 
   // LOOP ===========================================================
-  // const std::array<Long64_t,2> input_range =
-  //   runcards.value("input_range",{0,0});
-  // if (input_range[0]) reader.SetEntry(input_range[0]);
-  // if (input_range[1]) reader.SetEntry(input_range[1]);
-  using counter = ivanp::timed_counter<Long64_t>;
-  // TODO: fix counter
-  for (counter ent(reader.GetEntries(true)); reader.Next(); ++ent) {
+  const std::array<Long64_t,2> entry_range =
+    runcards.value<decltype(entry_range)>("entry_range",{0,0});
+  reader.SetEntriesRange(entry_range[0],entry_range[1]);
+  for ( ivanp::timed_counter<Long64_t> ent( entry_range[0],
+          entry_range[1] > entry_range[0]
+          ? entry_range[1]
+          : reader.GetEntries(true)
+        ); reader.Next(); ++ent)
+  {
 
     // TODO: add reweighting
 

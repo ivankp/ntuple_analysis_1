@@ -51,3 +51,5 @@ path='/home/ivanp/work/ntuple_analysis'
 ${path}/bin/analyses/test ${path}/runcards/test.json $1 \
   --tmp-dir=$TMPDIR
 
+rm $TMPDIR/*.root
+
