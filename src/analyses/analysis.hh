@@ -4,6 +4,8 @@
 #include <vector>
 #include <list>
 #include <regex>
+#include <cstdio>
+#include <wordexp.h>
 
 #include <boost/optional.hpp>
 
@@ -39,7 +41,6 @@ using std::string;
 using std::vector;
 using ivanp::cat;
 
-#include <cstdio>
 #include <boost/core/noncopyable.hpp>
 class tmp_file_wrap: private boost::noncopyable {
   string fname;
@@ -92,6 +93,14 @@ int main(int argc, char* argv[]) {
     runcards.merge_patch(runcard);
   }
 
+  if (!tmp_dir.empty()) {
+    wordexp_t full_path;
+    wordexp("~/.condor_cp_mutex", &full_path, 0);
+    cout << "\033[36mWrote\033[0m: " << full_path.we_wordv[0] << endl;
+    std::ofstream(full_path.we_wordv[0],std::ios::app);
+    wordfree(&full_path);
+  }
+
   // Chain and friend input files ===================================
   std::list<tmp_file_wrap> tmp_files;
   std::list<TChain> chains;
@@ -99,8 +108,6 @@ int main(int argc, char* argv[]) {
   for (const auto& input : runcards.at("input")) {
     const string info = input.value("info","");
     if (!info.empty()) cout << "\033[36mInfo\033[0m: " << info << endl;
-
-    // const bool getnentries = input.value("getnentries",true);
 
     TChain* chain = nullptr;
     string tree_name = input.value("tree","");

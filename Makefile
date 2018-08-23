@@ -53,9 +53,9 @@ bin/analyses/test: \
   $(BLD)/ivanp/program_options/program_options.o \
   $(BLD)/ivanp/binner/re_axes.o \
   $(BLD)/glob.o \
-  $(BLD)/Higgs2diphoton.o \
+  $(BLD)/copy_file.o \
   $(BLD)/lzma_compress.o \
-  $(BLD)/copy_file.o
+  $(BLD)/Higgs2diphoton.o
 
 -include $(DEPS)
 
