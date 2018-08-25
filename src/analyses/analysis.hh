@@ -5,7 +5,7 @@
 #include <list>
 #include <regex>
 #include <cstdio>
-#include <wordexp.h>
+// #include <wordexp.h>
 
 #include <boost/optional.hpp>
 
@@ -51,7 +51,7 @@ public:
   ~tmp_file_wrap() {
     if (!fname.empty())
       if (remove(fname.c_str()))
-        perror(("\033[31mError deleting file\033[31m \""+fname+"\"").c_str());
+        perror(("\033[31mError deleting file\033[0m \""+fname+"\"").c_str());
   }
 };
 
@@ -86,31 +86,47 @@ int main(int argc, char* argv[]) {
 
   // Read runcards ==================================================
   nlohmann::json runcards;
-  std::ifstream(card_names[0]) >> runcards;
-  for (const auto& card_name : card_names) {
+  for (const auto& filename : card_names) {
     nlohmann::json runcard;
-    std::ifstream(card_name) >> runcard;
+    std::ifstream file(filename);
+    file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    try {
+      file >> runcard;
+    } catch (const std::exception& e) {
+      cerr << "\033[31mError reading file\033[0m \"" << filename << "\": "
+           << e.what() << endl;
+      return 1;
+    }
     runcards.merge_patch(runcard);
   }
 
+  // block copy for other jobs
+  /*
+  boost::optional<tmp_file_wrap> condor_cp_mutex;
   if (!tmp_dir.empty()) {
     wordexp_t full_path;
     wordexp("~/.condor_cp_mutex", &full_path, 0);
-    cout << "\033[36mWrote\033[0m: " << full_path.we_wordv[0] << endl;
-    std::ofstream(full_path.we_wordv[0],std::ios::app);
+    const char* str = full_path.we_wordv[0];
+    std::ofstream(str,std::ios::app).close();
+    // system(cat("touch ",str).c_str());
+    cout << "\033[36mWrote\033[0m: " << str << endl;
+    system(cat("ls -lh ",str).c_str());
+    condor_cp_mutex.emplace(str);
     wordfree(&full_path);
   }
+  */
 
   // Chain and friend input files ===================================
   std::list<tmp_file_wrap> tmp_files;
   std::list<TChain> chains;
   vector<string> weights_names;
-  for (const auto& input : runcards.at("input")) {
+  for (auto& input : runcards.at("input")) {
     const string info = input.value("info","");
     if (!info.empty()) cout << "\033[36mInfo\033[0m: " << info << endl;
 
     TChain* chain = nullptr;
     string tree_name = input.value("tree","");
+    vector<string> file_names;
     for (const string& file_glob : input.at("files")) { // Chain input files
       for (string& file_name : ivanp::glob(file_glob)) {
         if (file_name.empty() || file_name.back()=='/') {
@@ -118,6 +134,7 @@ int main(int argc, char* argv[]) {
                << file_name << "\"" << endl;
           return 1;
         }
+        file_names.push_back(file_name);
         if (!tmp_dir.empty()) { // copy input files to tmp_dir
           string tmp_file_name = tmp_dir + string(
             std::find(file_name.rbegin(), file_name.rend(), '/').base(),
@@ -164,6 +181,7 @@ int main(int argc, char* argv[]) {
         cout << "  " << file_name << endl;
       }
     }
+    input["files"] = file_names;
 
     auto weights = input.find("weights"); // Add weights
     if (weights!=input.end()) {
@@ -189,6 +207,11 @@ int main(int argc, char* argv[]) {
       chains.front().AddFriend(chain);
   }
   TChain& chain = chains.front();
+
+  // delete the blocking file
+  // system("ls -lh /home/ivanp/.condor_cp_mutex");
+  // system("rm -fv /home/ivanp/.condor_cp_mutex");
+  // if (condor_cp_mutex) condor_cp_mutex = boost::none;
 
   if (weights_names.empty()) { // Find default weights
     const char* names[] = { "weight2", "weight" };

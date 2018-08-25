@@ -5,7 +5,7 @@
 !README*
 !include/
 !src/
-!runcards/
+!cards/
 
 !sql/*/
 sql/*.db

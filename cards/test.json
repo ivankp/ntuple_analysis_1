@@ -7,14 +7,14 @@
   "tree": "t3",
   "weights": "weight.*"
 }],
-"entry_range": [0,1e5],
+"entry_range": [0,0],
 "analysis": {
   "jets": {
     "cuts": { "pT": 30, "eta": 4.4 },
     "alg": [ "antikt", 0.4 ],
     "N_required": 1
   },
-  "binning": "/home/ivanp/work/ntuple_analysis/runcards/Hjets.bins"
+  "binning": "/home/ivanp/work/ntuple_analysis/cards/Hjets.bins"
 },
 "output": "/home/ivanp/work/ntuple_analysis/test.json"
 }
