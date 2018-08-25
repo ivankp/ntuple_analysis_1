@@ -2,23 +2,20 @@
 
 source ../env.sh
 
-echo "$@"
+echo "@ = $@"
 echo "pwd -P: $(pwd -P)"
 echo "TMPDIR = $TMPDIR"
 echo "LD_LIBRARY_PATH = $LD_LIBRARY_PATH"
 
-# echo "ls from job.sh"
-# ls -lh /home/ivanp/.condor_cp_mutex
-# ls -lh .condor_cp_mutex
-while [ -a "~/.condor_cp_mutex" ]
-do
-  echo waiting
-  sleep 1
-done
+# while [ -a "~/.condor_cp_mutex" ]
+# do
+#   echo waiting
+#   sleep 1
+# done
 
-# touch ~/.condor_cp_mutex
+sleep $(bc <<< "0.1*$1")
 
-../../bin/analyses/test ../../cards/test.json $1 --tmp-dir=$TMPDIR
+../../bin/analyses/test ../../cards/test.json $2 --tmp-dir=$TMPDIR
 
 exit_code=$?
 if [ $exit_code -ne 0 ]; then
@@ -28,5 +25,5 @@ else
 fi
 printf "Analysis finished\033[0m\n"
 
-rm -fv $TMPDIR/*
+rm -rfv $TMPDIR/*
 

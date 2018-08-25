@@ -4,8 +4,6 @@
 #include <vector>
 #include <list>
 #include <regex>
-#include <cstdio>
-// #include <wordexp.h>
 
 #include <boost/optional.hpp>
 
@@ -41,20 +39,6 @@ using std::string;
 using std::vector;
 using ivanp::cat;
 
-#include <boost/core/noncopyable.hpp>
-class tmp_file_wrap: private boost::noncopyable {
-  string fname;
-public:
-  tmp_file_wrap(tmp_file_wrap&& x): fname(std::move(x.fname)) { }
-  template <typename... T>
-  tmp_file_wrap(T&&... x): fname(std::forward<T>(x)...) { }
-  ~tmp_file_wrap() {
-    if (!fname.empty())
-      if (remove(fname.c_str()))
-        perror(("\033[31mError deleting file\033[0m \""+fname+"\"").c_str());
-  }
-};
-
 inline nlohmann::json::json_pointer operator "" _jp(const char* s, size_t n) {
   return nlohmann::json::json_pointer(std::string(s,n));
 }
@@ -79,7 +63,7 @@ int main(int argc, char* argv[]) {
       .parse(argc,argv,true)) return 0;
     if (!tmp_dir.empty() && tmp_dir.back()!='/') tmp_dir += '/';
   } catch (const std::exception& e) {
-    cerr << "\033[31m" << e.what() << "\033[0m" << endl;
+    cerr << e << endl;
     return 1;
   }
   // ================================================================
@@ -100,24 +84,8 @@ int main(int argc, char* argv[]) {
     runcards.merge_patch(runcard);
   }
 
-  // block copy for other jobs
-  /*
-  boost::optional<tmp_file_wrap> condor_cp_mutex;
-  if (!tmp_dir.empty()) {
-    wordexp_t full_path;
-    wordexp("~/.condor_cp_mutex", &full_path, 0);
-    const char* str = full_path.we_wordv[0];
-    std::ofstream(str,std::ios::app).close();
-    // system(cat("touch ",str).c_str());
-    cout << "\033[36mWrote\033[0m: " << str << endl;
-    system(cat("ls -lh ",str).c_str());
-    condor_cp_mutex.emplace(str);
-    wordfree(&full_path);
-  }
-  */
-
   // Chain and friend input files ===================================
-  std::list<tmp_file_wrap> tmp_files;
+  vector<string> tmp_files;
   std::list<TChain> chains;
   vector<string> weights_names;
   for (auto& input : runcards.at("input")) {
@@ -262,4 +230,10 @@ int main(int argc, char* argv[]) {
 #define ANALYSIS_END
 #include STR(ANALYSIS)
 #undef ANALYSIS_END
+
+  for (const string& fname : tmp_files) { // delete temporary files
+    if (!fname.empty())
+      if (remove(fname.c_str()))
+        perror(("\033[31mError deleting file\033[0m \""+fname+"\"").c_str());
+  }
 }
