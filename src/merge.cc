@@ -29,12 +29,14 @@ inline json::json_pointer operator "" _jp(const char* s, size_t n) {
 
 template <typename T>
 void compat(const T& key, const json& a, const json& b) {
-  if (a.at(key) != b.at(key)) throw ivanp::error("Incompatible \"",key,"\"");
+  if (a.at(key) != b.at(key)) throw ivanp::error("Incompatible ",key);
 }
 
 template <typename T>
 void add(const std::tuple<json*,json*>& j) {
-  *get<0>(j) = get<0>(j)->get<T>() + get<1>(j)->get<T>();
+  auto x = get<0>(j)->get<T>() + get<1>(j)->get<T>();
+  TEST(x)
+  *get<0>(j) = x;
 }
 
 // https://stackoverflow.com/a/40873657/2640636
@@ -70,7 +72,7 @@ int main(int argc, char* argv[]) {
            << e.what() << endl;
       return 1;
     }
-    if (i==2) {
+    if (i==2) { // first file
       auto& output = in.at("/annotation/runcard/output"_jp);
       output = { output };
       out = in;
@@ -107,8 +109,8 @@ int main(int argc, char* argv[]) {
                 rec(bins | [i](auto* x){ return &x->at(i); });
               break;
             case (json::value_t::number_float): add<double>(bins); break;
-            case (json::value_t::number_integer): add<long int>(bins); break;
-            case (json::value_t::number_unsigned): add<long unsigned>(bins); break;
+            case (json::value_t::number_integer): add<long>(bins); break;
+            case (json::value_t::number_unsigned): add<long>(bins); break;
             case (json::value_t::null): break;
             default: throw ivanp::error(
               "non-numeric type of bin value \"",*get<0>(bins),"\"");

@@ -42,14 +42,17 @@ EXES := $(patsubst src%$(EXT),bin%, \
   $(shell $(GREP_EXES)) \
   $(wildcard src/analyses/*$(EXT)))
 
+all: $(EXES)
+
+-include $(DEPS)
+
+# -------------------------------------------------------------------
 C_Higgs2diphoton := $(ROOT_CXXFLAGS)
 
 C_analyses/test := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS)
 L_analyses/test := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) -llzma
 
 L_merge := -llzma
-
-all: $(EXES)
 
 bin/analyses/test: \
   $(BLD)/ivanp/program_options/program_options.o \
@@ -61,22 +64,19 @@ bin/analyses/test: \
 
 bin/merge: \
   $(BLD)/lzma_compress.o
+# -------------------------------------------------------------------
 
--include $(DEPS)
-
-.SECONDEXPANSION:
-
-$(DEPS): $(BLD)/%.d: src/%$(EXT) | $(BLD)/$$(dir %)
+$(DEPS): $(BLD)/%.d: src/%$(EXT)
+	@mkdir -pv $(dir $@)
 	$(CXX) $(CPPFLAGS) $(C_$*) -MM -MT '$(@:.d=.o)' $< -MF $@
 
-$(BLD)/%.o: | $(BLD)
+$(BLD)/%.o:
+	@mkdir -pv $(dir $@)
 	$(CXX) $(CXXFLAGS) $(C_$*) -c $(filter %$(EXT),$^) -o $@
 
-bin/%: $(BLD)/%.o | $$(dir bin/%)
+bin/%: $(BLD)/%.o
+	@mkdir -pv $(dir $@)
 	$(CXX) $(LDFLAGS) $(filter %.o,$^) -o $@ $(LDLIBS) $(L_$*)
-
-bin/%/ $(BLD)/%/:
-	mkdir -p $@
 
 endif
 
