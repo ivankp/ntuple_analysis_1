@@ -34,9 +34,7 @@ void compat(const T& key, const json& a, const json& b) {
 
 template <typename T>
 void add(const std::tuple<json*,json*>& j) {
-  auto x = get<0>(j)->get<T>() + get<1>(j)->get<T>();
-  TEST(x)
-  *get<0>(j) = x;
+  *get<0>(j) = ( get<0>(j)->get<T>() + get<1>(j)->get<T>() );
 }
 
 // https://stackoverflow.com/a/40873657/2640636
@@ -94,12 +92,12 @@ int main(int argc, char* argv[]) {
       out.at("/annotation/runcard/output"_jp).emplace_back(std::move(
         in.at("/annotation/runcard/output"_jp)));
 
-      auto hists = tie(out,in) | [](auto& x){ return x.at("histograms"); };
-      for (auto it=get<0>(hists).begin(),
-               end=get<0>(hists).end(); it!=end; ++it)
+      auto hists = tie(out,in) | [](auto& x){ return &x.at("histograms"); };
+      for (auto it=get<0>(hists)->begin(),
+               end=get<0>(hists)->end(); it!=end; ++it)
       {
-        auto& h_out = get<0>(hists).at(it.key());
-        auto& h_in  = it.value();
+        auto& h_out = it.value();
+        auto& h_in  = get<1>(hists)->at(it.key());
         compat("axes",h_out,h_in);
 
         make_Ycombinator([](auto rec, const auto& bins) -> void {
@@ -109,11 +107,11 @@ int main(int argc, char* argv[]) {
                 rec(bins | [i](auto* x){ return &x->at(i); });
               break;
             case (json::value_t::number_float): add<double>(bins); break;
+            case (json::value_t::number_unsigned):
             case (json::value_t::number_integer): add<long>(bins); break;
-            case (json::value_t::number_unsigned): add<long>(bins); break;
             case (json::value_t::null): break;
             default: throw ivanp::error(
-              "non-numeric type of bin value \"",*get<0>(bins),"\"");
+              "non-numeric bin value \"",*get<0>(bins),"\"");
           }
         })(
           tie(h_out,h_in) | [](auto& x){ return &x.at("bins"); }
