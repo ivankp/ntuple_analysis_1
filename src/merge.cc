@@ -92,30 +92,14 @@ int main(int argc, char* argv[]) {
       out.at("/annotation/runcard/output"_jp).emplace_back(std::move(
         in.at("/annotation/runcard/output"_jp)));
 
-      // const auto bins_sizes = out.at("/annotation/bins"_jp)
-      //   | [](const auto& x){ return x.at(1).size(); };
-
-      auto hists = tie(in,out) | [](auto& x){ return x.at("histograms"); };
+      auto hists = tie(out,in) | [](auto& x){ return x.at("histograms"); };
       for (auto it=get<0>(hists).begin(),
                end=get<0>(hists).end(); it!=end; ++it)
       {
-        auto& h_out = get<1>(hists).at(it.key());
+        auto& h_out = get<0>(hists).at(it.key());
         auto& h_in  = it.value();
         compat("axes",h_out,h_in);
 
-        // auto bins = tie(h_out,h_in) | [](auto& x){ return &x.at("bins"); };
-        /*{
-          auto impl = [&](auto& f) mutable {
-            const auto prev = bins;
-            for (unsigned i=0, n=get<0>(bins)->size(); i<n; ++i) {
-              bins = prev | [i](auto* x){ return &x->at(i); };
-              if (get<0>(bins)->is_array()) f(f);
-              else get<0>(bins) += get<1>(bins);
-            }
-            bins = prev;
-          };
-          impl(impl);
-        }*/
         make_Ycombinator([](auto rec, const auto& bins) -> void {
           switch (get<0>(bins)->type()) {
             case (json::value_t::array):
