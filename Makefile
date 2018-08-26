@@ -60,6 +60,9 @@ bin/analyses/test: \
   $(BLD)/glob.o \
   $(BLD)/copy_file.o \
   $(BLD)/Higgs2diphoton.o
+
+bin/merge: \
+  $(BLD)/ivanp/program_options/program_options.o
 # -------------------------------------------------------------------
 
 $(DEPS): $(BLD)/%.d: src/%$(EXT)

@@ -128,7 +128,7 @@ cout << jet_def.description() << endl;
 cout << "\033[36mNjets\033[0m >= " << njets_required << endl;
 
 Int_t prev_id = -1;
-size_t ncount_total = 0, num_events = 0;
+size_t num_entries=0, num_events=0, ncount_total=0;
 
 std::vector<fj::PseudoJet> partons;
 Higgs2diphoton Hdecay;
@@ -147,6 +147,7 @@ for (unsigned i=_weights.size(); i--; ) // set weights
   bin_t::weights[i] = *_weights[i];
 
 // Keep track of multi-entry events -------------------------------
+++num_entries;
 nlo_bin::current_id = *_id;
 const bool new_id = (prev_id != nlo_bin::current_id);
 if (new_id) {
@@ -227,6 +228,12 @@ auto& ann = out["annotation"];
 
 ann["runcard"] = runcards;
 
+auto& cnt = ann["count"];
+cnt["entries"] = num_entries;
+cnt["events"] = num_events;
+cnt["ncount"] = ncount_total;
+cnt["norm"] = ncount_total;
+
 #define CATEGORY_ANN(r, data, elem) \
   ann_bins.push_back({STR(elem),enum_traits<elem>::all_str()});
 
@@ -243,7 +250,7 @@ for (const auto& h : hist<1,0>::all) hists[h.name] = *h;
 const string ofname = runcards["output"];
 cout << "\033[36mWriting output\033[0m: " << ofname << endl;
 
-try {
+try { // write output file
   std::ofstream file(ofname);
   file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
   if (ivanp::ends_with(ofname,".xz")) {

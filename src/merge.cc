@@ -10,6 +10,7 @@
 #include "ivanp/error.hh"
 #include "ivanp/tuple.hh"
 #include "ivanp/container.hh"
+#include "ivanp/program_options.hh"
 
 #define TEST(var) \
   std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;
@@ -37,6 +38,7 @@ template <typename T>
 void add(const std::tuple<json*,json*>& j) {
   *get<0>(j) = ( get<0>(j)->get<T>() + get<1>(j)->get<T>() );
 }
+template <typename T> T get(const json& j) { return j.get<T>(); }
 
 // https://stackoverflow.com/a/40873657/2640636
 template <class F> struct Ycombinator {
@@ -52,20 +54,32 @@ Ycombinator<std::decay_t<F>> make_Ycombinator(F&& f) {
 }
 
 int main(int argc, char* argv[]) {
-  if (argc<2 || std::any_of(argv+1,argv+argc,[](const char* arg){
-    return !strcmp(arg,"-h") || !strcmp(arg,"--help");
-  })) {
-    cout << "usage: " << argv[0] << " output.json input.json ..." << endl;
+  std::vector<const char*> ifnames;
+  const char* ofname;
+  bool merge_xsec = false;
+
+  try {
+    using namespace ivanp::po;
+    if (program_options()
+      (ifnames,'i',"input JSON files",req(),pos())
+      (ofname,'o',"output JSON file",req())
+      (merge_xsec,{"-x","--xsec","--nlo"},
+       "merge cross sections (e.g. NLO parts)")
+      .parse(argc,argv,true)) return 0;
+  } catch (const std::exception& e) {
+    cerr << e << endl;
     return 1;
   }
+  // ================================================================
 
   json out;
-  for (int i=2; i<argc; ++i) {
+  for (const char* ifname : ifnames) {
+    static bool first = true;
     json in;
     try {
-      std::ifstream file(argv[i]);
+      std::ifstream file(ifname);
       file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-      if (ivanp::ends_with(argv[i],".xz")) {
+      if (ivanp::ends_with(ifname,".xz")) {
         namespace bio = boost::iostreams;
         bio::filtering_streambuf<bio::input> buf;
         buf.push(bio::lzma_decompressor());
@@ -73,21 +87,37 @@ int main(int argc, char* argv[]) {
         std::istream(&buf) >> in;
       } else file >> in;
     } catch (const std::exception& e) {
-      cerr << "\033[31mError reading file\033[0m \"" << argv[i] << "\": "
+      cerr << "\033[31mError reading file\033[0m \"" << ifname << "\": "
            << e.what() << endl;
       return 1;
     }
-    if (i==2) { // first file
-      auto& output = in.at("/annotation/runcard/output"_jp);
+
+    if (merge_xsec) { // scale input to scross section
+      const double norm = in.at("/annotation/count/norm"_jp);
+      for (auto& h : in.at("histograms")) {
+        make_Ycombinator([norm](auto rec, auto& bin, unsigned depth) -> void {
+          if (bin.is_null()) return;
+          if (depth) for (auto& b : bin) rec(b,depth-1);
+          else {
+            bin[0] = get<double>(bin.at(0))/norm;
+            bin[1] = get<double>(bin.at(1))/(norm*norm);
+          }
+        })(h.at("bins"),in.at("/annotation/bins"_jp).size());
+      }
+    }
+
+    if (first) { // first file
+      first = false;
+      out = std::move(in);
+      auto& output = out.at("/annotation/runcard/output"_jp);
       output = { output };
-      in.at("/annotation/runcard"_jp).erase("entry_range");
-      out = in;
+      out.at("/annotation/runcard"_jp).erase("entry_range");
     } else {
       try {
         compat("/annotation/bins"_jp,out,in);
         compat("/annotation/runcard/analysis"_jp,out,in);
       } catch (const std::exception& e) {
-        cerr << "In file \"" << argv[i] << "\": " << e << endl;
+        cerr << "In file \"" << ifname << "\": " << e << endl;
         return 1;
       }
 
@@ -99,6 +129,16 @@ int main(int argc, char* argv[]) {
 
       out.at("/annotation/runcard/output"_jp).emplace_back(std::move(
         in.at("/annotation/runcard/output"_jp)));
+
+      auto count = tie(out,in) | [](auto& x){
+        return &x.at("/annotation/count"_jp);
+      };
+      for (auto it=get<0>(count)->begin(),
+               end=get<0>(count)->end(); it!=end; ++it)
+      {
+        add<long unsigned>(
+          std::make_tuple(&it.value(),&get<1>(count)->at(it.key())));
+      }
 
       auto hists = tie(out,in) | [](auto& x){ return &x.at("histograms"); };
       for (auto it=get<0>(hists)->begin(),
@@ -128,10 +168,12 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  if (merge_xsec) out.at("/annotation/count/norm"_jp) = 1;
+
   try {
-    std::ofstream file(argv[1]);
+    std::ofstream file(ofname);
     file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
-    if (ivanp::ends_with(argv[1],".xz")) {
+    if (ivanp::ends_with(ofname,".xz")) {
       namespace bio = boost::iostreams;
       bio::filtering_streambuf<bio::output> buf;
       buf.push(bio::lzma_compressor(bio::lzma::best_compression));
@@ -139,7 +181,7 @@ int main(int argc, char* argv[]) {
       std::ostream(&buf) << out;
     } else file << out;
   } catch (const std::exception& e) {
-    cerr << "\033[31mError writing file\033[0m \"" << argv[1] << "\": "
+    cerr << "\033[31mError writing file\033[0m \"" << ofname << "\": "
          << e.what() << endl;
     return 1;
   }
