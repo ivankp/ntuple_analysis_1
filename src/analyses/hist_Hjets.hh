@@ -241,7 +241,7 @@ for (const auto& h : hist<1,0>::all) hists[h.name] = *h;
 const string ofname = runcards["output"];
 cout << "\033[36mWriting output\033[0m: " << ofname << endl;
 
-if (ofname.substr(ofname.size()-3) == ".xz") {
+if (ivanp::ends_with(ofname,".xz")) {
   std::ofstream(ofname) << lzma_compress(out.dump(),6);
 } else std::ofstream(ofname) << out;
 

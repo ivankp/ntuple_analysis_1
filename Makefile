@@ -47,6 +47,8 @@ C_Higgs2diphoton := $(ROOT_CXXFLAGS)
 C_analyses/test := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS)
 L_analyses/test := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) -llzma
 
+L_merge := -llzma
+
 all: $(EXES)
 
 bin/analyses/test: \
@@ -56,6 +58,9 @@ bin/analyses/test: \
   $(BLD)/copy_file.o \
   $(BLD)/lzma_compress.o \
   $(BLD)/Higgs2diphoton.o
+
+bin/merge: \
+  $(BLD)/lzma_compress.o
 
 -include $(DEPS)
 
