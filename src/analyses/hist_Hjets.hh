@@ -5,6 +5,9 @@
 
 #ifdef ANALYSIS_GLOBAL // ===========================================
 
+#include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/iostreams/filter/lzma.hpp>
+
 #include <TH1.h>
 #include <TLorentzVector.h>
 
@@ -22,7 +25,6 @@
 #include "json/JetAlgorithm.hh"
 #include "json/binner.hh"
 #include "json/bins.hh"
-#include "lzma_compress.hh"
 
 #include "Higgs2diphoton.hh"
 
@@ -241,9 +243,21 @@ for (const auto& h : hist<1,0>::all) hists[h.name] = *h;
 const string ofname = runcards["output"];
 cout << "\033[36mWriting output\033[0m: " << ofname << endl;
 
-if (ivanp::ends_with(ofname,".xz")) {
-  std::ofstream(ofname) << lzma_compress(out.dump(),6);
-} else std::ofstream(ofname) << out;
+try {
+  std::ofstream file(ofname);
+  file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+  if (ivanp::ends_with(ofname,".xz")) {
+    namespace bio = boost::iostreams;
+    bio::filtering_streambuf<bio::output> buf;
+    buf.push(bio::lzma_compressor(bio::lzma::best_compression));
+    buf.push(file);
+    std::ostream(&buf) << out;
+  } else file << out;
+} catch (const std::exception& e) {
+  cerr << "\033[31mError writing file\033[0m \"" << ofname << "\": "
+       << e.what() << endl;
+  return 1;
+}
 
 #endif
 

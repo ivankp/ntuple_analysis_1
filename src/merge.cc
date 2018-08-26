@@ -2,13 +2,14 @@
 #include <fstream>
 #include <functional>
 
+#include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/iostreams/filter/lzma.hpp>
+
 #include "json/nlohmann.hpp"
 
 #include "ivanp/error.hh"
 #include "ivanp/tuple.hh"
 #include "ivanp/container.hh"
-#include "lzma_compress.hh"
-#include "ivanp/debug/type_str.hh"
 
 #define TEST(var) \
   std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;
@@ -64,7 +65,13 @@ int main(int argc, char* argv[]) {
     try {
       std::ifstream file(argv[i]);
       file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-      file >> in;
+      if (ivanp::ends_with(argv[i],".xz")) {
+        namespace bio = boost::iostreams;
+        bio::filtering_streambuf<bio::input> buf;
+        buf.push(bio::lzma_decompressor());
+        buf.push(file);
+        std::istream(&buf) >> in;
+      } else file >> in;
     } catch (const std::exception& e) {
       cerr << "\033[31mError reading file\033[0m \"" << argv[i] << "\": "
            << e.what() << endl;
@@ -73,6 +80,7 @@ int main(int argc, char* argv[]) {
     if (i==2) { // first file
       auto& output = in.at("/annotation/runcard/output"_jp);
       output = { output };
+      in.at("/annotation/runcard"_jp).erase("entry_range");
       out = in;
     } else {
       try {
@@ -120,7 +128,19 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  if (ivanp::ends_with(argv[1],".xz")) {
-    std::ofstream(argv[1]) << lzma_compress(out.dump(),6);
-  } else std::ofstream(argv[1]) << out;
+  try {
+    std::ofstream file(argv[1]);
+    file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+    if (ivanp::ends_with(argv[1],".xz")) {
+      namespace bio = boost::iostreams;
+      bio::filtering_streambuf<bio::output> buf;
+      buf.push(bio::lzma_compressor(bio::lzma::best_compression));
+      buf.push(file);
+      std::ostream(&buf) << out;
+    } else file << out;
+  } catch (const std::exception& e) {
+    cerr << "\033[31mError writing file\033[0m \"" << argv[1] << "\": "
+         << e.what() << endl;
+    return 1;
+  }
 }

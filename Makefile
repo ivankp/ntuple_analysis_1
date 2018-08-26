@@ -50,20 +50,16 @@ all: $(EXES)
 C_Higgs2diphoton := $(ROOT_CXXFLAGS)
 
 C_analyses/test := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS)
-L_analyses/test := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) -llzma
+L_analyses/test := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) -lboost_iostreams
 
-L_merge := -llzma
+L_merge := -lboost_iostreams
 
 bin/analyses/test: \
   $(BLD)/ivanp/program_options/program_options.o \
   $(BLD)/ivanp/binner/re_axes.o \
   $(BLD)/glob.o \
   $(BLD)/copy_file.o \
-  $(BLD)/lzma_compress.o \
   $(BLD)/Higgs2diphoton.o
-
-bin/merge: \
-  $(BLD)/lzma_compress.o
 # -------------------------------------------------------------------
 
 $(DEPS): $(BLD)/%.d: src/%$(EXT)
