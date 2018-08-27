@@ -94,15 +94,17 @@ int main(int argc, char* argv[]) {
 
     if (merge_xsec) { // scale input to scross section
       const double norm = in.at("/annotation/count/norm"_jp);
-      for (auto& h : in.at("histograms")) {
-        make_Ycombinator([norm](auto rec, auto& bin, unsigned depth) -> void {
-          if (bin.is_null()) return;
-          if (depth) for (auto& b : bin) rec(b,depth-1);
-          else {
-            bin[0] = get<double>(bin.at(0))/norm;
-            bin[1] = get<double>(bin.at(1))/(norm*norm);
-          }
-        })(h.at("bins"),in.at("/annotation/bins"_jp).size());
+      if (norm!=1) {
+        for (auto& h : in.at("histograms")) {
+          make_Ycombinator([norm](auto rec, auto& bin, unsigned depth)->void {
+            if (bin.is_null()) return;
+            if (depth) for (auto& b : bin) rec(b,depth-1);
+            else {
+              bin[0] = get<double>(bin.at(0))/norm;
+              bin[1] = get<double>(bin.at(1))/(norm*norm);
+            }
+          })(h.at("bins"),in.at("/annotation/bins"_jp).size());
+        }
       }
     }
 
