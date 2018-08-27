@@ -14,23 +14,23 @@ private:
   static inline std::enable_if_t<I!=0>
   write(json& j, ii_t& ii, const hist& h) {
     using spec = typename hist::template axis_spec<I>;
-    const i_t n = std::get<I>(h.axes()).nbins() + spec::under::value;
-    for (i_t& i = std::get<I>(ii) = 0; i<=n; ++i) {
-      if (i==0 && !spec::under::value) j[i] = nullptr; else
-      if (i==n && !spec::over ::value) j[i] = nullptr; else
-      write<I>( j[i], ii, h );
+    const i_t n = std::get<I>(h.axes()).nbins() + spec::nover::value;
+    if (!spec::under::value) j.emplace_back(nullptr);
+    for (i_t& i = std::get<I>(ii) = 0; i<n; ++i) {
+      j.emplace_back();
+      write<I>( j.back(), ii, h );
     }
+    if (!spec::over::value) j.emplace_back(nullptr);
   }
   template <unsigned I = sizeof...(Ax)-1>
   static inline std::enable_if_t<I==0>
   write(json& j, ii_t& ii, const hist& h) {
     using spec = typename hist::template axis_spec<I>;
-    const i_t n = std::get<I>(h.axes()).nbins() + spec::under::value;
-    for (i_t& i = std::get<I>(ii) = 0; i<=n; ++i) {
-      if (i==0 && !spec::under::value) j[i] = nullptr; else
-      if (i==n && !spec::over ::value) j[i] = nullptr; else
-      j[i] = h[ii];
-    }
+    const i_t n = std::get<I>(h.axes()).nbins() + spec::nover::value;
+    if (!spec::under::value) j.emplace_back(nullptr);
+    for (i_t& i = std::get<I>(ii) = 0; i<n; ++i)
+      j.emplace_back(h[ii]);
+    if (!spec::over::value) j.emplace_back(nullptr);
   }
 public:
   static void to_json(json& j, const hist& h) {
