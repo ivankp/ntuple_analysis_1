@@ -99,7 +99,7 @@ bin_t::weights.resize(_weights.size());
 
 ivanp::binner<bin_t, std::tuple<ivanp::axis_spec<
     ivanp::uniform_axis<int>,0,1
-  >>> h_Njets({njets_required+1u,0,(int)njets_required+1});
+  >>> h_Njets({njets_required+2u,0,(int)njets_required+2});
 
 #define H_MACRO(_1,_2,_3,NAME,...) NAME
 #define h_(...) H_MACRO(__VA_ARGS__, h3_, h2_, h1_)(__VA_ARGS__)
@@ -243,7 +243,12 @@ BOOST_PP_SEQ_FOR_EACH(CATEGORY_ANN,,CATEGORIES)
 ann_bins.push_back({"bin",{"w","w2","n"}});
 
 auto& hists = out["histograms"];
+
 hists["Njets_excl"] = h_Njets;
+auto h_Njets_incl = h_Njets;
+h_Njets_incl.integrate_left();
+hists["Njets_incl"] = h_Njets_incl;
+
 for (const auto& h : hist<1  >::all) hists[h.name] = *h;
 for (const auto& h : hist<1,0>::all) hists[h.name] = *h;
 

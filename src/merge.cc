@@ -111,9 +111,11 @@ int main(int argc, char* argv[]) {
     if (first) { // first file
       first = false;
       out = std::move(in);
-      auto& output = out.at("/annotation/runcard/output"_jp);
-      output = { output };
-      out.at("/annotation/runcard"_jp).erase("entry_range");
+      // auto& output = out.at("/annotation/runcard/output"_jp);
+      // if (!output.is_array()) output = { std::move(output) };
+      auto& runcard = out.at("/annotation/runcard"_jp);
+      runcard.erase("entry_range");
+      runcard.erase("output");
     } else {
       try {
         compat("/annotation/bins"_jp,out,in);
@@ -129,8 +131,8 @@ int main(int argc, char* argv[]) {
         for (auto&& f : input_in[i].at("files"))
           input_out[i].at("files").emplace_back(std::move(f));
 
-      out.at("/annotation/runcard/output"_jp).emplace_back(std::move(
-        in.at("/annotation/runcard/output"_jp)));
+      // out.at("/annotation/runcard/output"_jp).emplace_back(std::move(
+      //   in.at("/annotation/runcard/output"_jp)));
 
       auto count = tie(out,in) | [](auto& x){
         return &x.at("/annotation/count"_jp);
