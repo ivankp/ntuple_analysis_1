@@ -207,11 +207,12 @@ if (A1_pT < A2_pT) {
 const double A1_eta = A1->Eta();
 const double A2_eta = A2->Eta();
 
-cat_bin::id<photon_cuts>()
-  =  (A1_pT < 0.35*125.)
-  && (A2_pT < 0.25*125.)
-  && photon_eta_cut(std::abs(A1_eta))
-  && photon_eta_cut(std::abs(A2_eta));
+cat_bin::id<photon_cuts>() = !(
+  (A1_pT < 0.35*125.) or
+  (A2_pT < 0.25*125.) or
+  photon_eta_cut(std::abs(A1_eta)) or
+  photon_eta_cut(std::abs(A2_eta))
+);
 
 // Fill Histograms ------------------------------------------------
 h_Njets.fill_bin(njets);
