@@ -1,7 +1,7 @@
 #ifndef IVANP_HIGGS2DIPHOTON_HH
 #define IVANP_HIGGS2DIPHOTON_HH
 
-#include <utility>
+#include <array>
 #include <random>
 
 #include <TLorentzVector.h>
@@ -19,8 +19,9 @@ public:
   using seed_type = typename decltype(gen)::result_type;
   Higgs2diphoton(seed_type seed);
 
-  std::pair<TLorentzVector,TLorentzVector>
-  operator()(const TLorentzVector& Higgs, bool new_kin=true);
+  using photons_type = std::array<TLorentzVector,2>;
+
+  photons_type operator()(const TLorentzVector& Higgs, bool new_kin=true);
 };
 
 

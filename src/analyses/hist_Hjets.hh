@@ -7,8 +7,8 @@
 
 #include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/iostreams/filter/lzma.hpp>
+#include <boost/preprocessor/repetition/repeat.hpp>
 
-#include <TH1.h>
 #include <TLorentzVector.h>
 
 #include <fastjet/ClusterSequence.hh>
@@ -18,7 +18,6 @@
 #include "ivanp/binner.hh"
 #include "ivanp/binner/category_bin.hh"
 #include "ivanp/binner/re_axes.hh"
-#include "binner_root.hh"
 #include "bin_defs.hh"
 #include "ivanp/container.hh"
 
@@ -88,7 +87,7 @@ for ( auto bo : *reader.GetTree()->GetListOfBranches() ) {
 TTreeReaderValue<Int_t> _id1(reader,"id1"), _id2(reader,"id2");
 
 const auto& conf = runcards.at("analysis");
-const unsigned njets_required = conf.value("/jets/N_required"_jp,0);
+const unsigned njets_required = conf.value("/jets/njets"_jp,0);
 
 const std::string bfname = conf.at("binning");
 cout << "\033[36mBinning\033[0m: " << bfname << '\n' << endl;
@@ -105,35 +104,35 @@ ivanp::binner<bin_t, std::tuple<ivanp::axis_spec<
 #define h_(...) H_MACRO(__VA_ARGS__, h3_, h2_, h1_)(__VA_ARGS__)
 
 #define h1_(X) hist<1> h_##X(#X,ra[#X]);
-#define h2_(X1,X2) hist<1,0> h_##X1##_##X2(#X1"-"#X2,ra[#X1"_2"],ra[#X2"_2"]);
+#define h2_(X1,X2) hist<1,0> \
+  h_##X1##_##X2(#X1"-"#X2, \
+    ra[#X1":"#X1"-"#X2], \
+    ra[#X2":"#X1"-"#X2]);
 #define h3_(X1,X2,X3) hist<1,0,0> \
-  h_##X1##_##X2##_##X3(#X1"-"#X2"-"#X3,ra[#X1"_2"],ra[#X2"_2"],ra[#X3"_2"]);
-
-#define hj_(X) auto h_jet_##X = reserve<hist<1>>(njets_required+1); \
-  for (unsigned i=0; i<=njets_required; ++i) { \
-    const auto name = cat("jet",i+1,"_"#X); \
-    h_jet_##X.emplace_back(name,ra[name]); \
-  }
-
-#define HIST_HJ_INIT
-#include STR(HIST_HJ)
-#undef HIST_HJ_INIT
+  h_##X1##_##X2##_##X3(#X1"-"#X2"-"#X3, \
+    ra[#X1":"#X1"-"#X2"-"#X3], \
+    ra[#X2":"#X1"-"#X2"-"#X3], \
+    ra[#X3":"#X1"-"#X2"-"#X3]);
 
 const double jet_pt_cut  = conf.at("/jets/cuts/pT"_jp);
 const double jet_eta_cut = conf.at("/jets/cuts/eta"_jp);
 const fj::JetDefinition jet_def = conf.at("/jets/alg"_jp);
 
-fj::ClusterSequence::print_banner(); // get it out of the way
-cout << jet_def.description() << endl;
-cout << "\033[36mNjets\033[0m >= " << njets_required << endl;
-
 Int_t prev_id = -1;
 size_t num_entries=0, num_events=0, ncount_total=0;
 
-std::vector<fj::PseudoJet> partons;
+std::vector<fj::PseudoJet> partons, jets;
 Higgs2diphoton Hdecay;
-std::pair<TLorentzVector,TLorentzVector> diphoton;
-boost::optional<TLorentzVector> higgs;
+Higgs2diphoton::photons_type photons;
+TLorentzVector higgs;
+
+#define HIST_HJ_INIT
+#include STR(HIST_HJ)
+#undef HIST_HJ_INIT
+
+fj::ClusterSequence::print_banner(); // get it out of the way
+cout << jet_def.description() << endl;
+cout << "\033[36mNjets\033[0m >= " << njets_required << endl;
 
 #endif
 #ifdef ANALYSIS_LOOP // =============================================
@@ -141,7 +140,6 @@ boost::optional<TLorentzVector> higgs;
 // Reset ----------------------------------------------------------
 const size_t np = *_nparticle;
 partons.clear();
-higgs = boost::none;
 
 for (unsigned i=_weights.size(); i--; ) // set weights
   bin_t::weights[i] = *_weights[i];
@@ -158,54 +156,53 @@ if (new_id) {
 
 // Read particles -------------------------------------------------
 unsigned n22 = 0; // number of photons
+unsigned n25 = 0; // number of Higgs
 for (size_t i=0; i<np; ++i) {
   if (_kf[i] == 25) {
-    if (higgs) throw std::runtime_error("more than one Higgs");
-    higgs.emplace(_px[i],_py[i],_pz[i],_E[i]);
+    if (n25) throw std::runtime_error("more than one Higgs");
+    higgs.SetPxPyPzE(_px[i],_py[i],_pz[i],_E[i]);
+    ++n25;
   } else if (_kf[i] == 22) {
-    if (n22>=2) throw std::runtime_error("more than two photons");
-    (n22 ? diphoton.second : diphoton.first)
-      .SetPxPyPzE(_px[i],_py[i],_pz[i],_E[i]);
+    if (n22>1) throw std::runtime_error("more than two photons");
+    photons[n22].SetPxPyPzE(_px[i],_py[i],_pz[i],_E[i]);
     ++n22;
   } else {
     partons.emplace_back(_px[i],_py[i],_pz[i],_E[i]);
   }
 }
-if (!higgs && n22!=2) throw std::runtime_error("missing Higgs or photons");
+if (!n25 && n22!=2) throw std::runtime_error("missing Higgs or photons");
 
 cat_bin::id<isp>() = (unsigned)get_isp(*_id1,*_id2);
 // ----------------------------------------------------------------
 
 // Jets -----------------------------------------------------------
 auto fj_seq = fj::ClusterSequence(partons,jet_def);
-auto fj_jets = fj_seq.inclusive_jets(jet_pt_cut); // apply pT cut
+jets = fj_seq.inclusive_jets(jet_pt_cut); // apply pT cut
 // apply eta cut
-for (auto it=fj_jets.begin(); it!=fj_jets.end(); ) {
-  if (std::abs(it->eta()) > jet_eta_cut) it = fj_jets.erase(it);
+for (auto it=jets.begin(); it!=jets.end(); ) {
+  if (std::abs(it->eta()) > jet_eta_cut) it = jets.erase(it);
   else ++it;
 }
 // sort by pT
-std::sort( fj_jets.begin(), fj_jets.end(),
+std::sort( jets.begin(), jets.end(),
   [](const fj::PseudoJet& a, const fj::PseudoJet& b){
     return ( a.pt() > b.pt() );
   });
 // resulting number of jets
-const unsigned njets = fj_jets.size();
+const unsigned njets = jets.size();
 
 // Higgs decay or add photons -------------------------------------
-if (higgs) diphoton = Hdecay(*higgs,new_id);
-else higgs = diphoton.first + diphoton.second;
+if (n25) photons = Hdecay(higgs,new_id);
+else higgs = photons[0] + photons[1];
 
-TLorentzVector *A1 = &diphoton.first, *A2 = &diphoton.second;
-double A1_pT = A1->Pt(), A2_pT = A2->Pt();
+double A1_pT = photons[0].Pt(), A2_pT = photons[1].Pt();
 if (A1_pT < A2_pT) {
-  std::swap(A1,A2);
+  std::swap(photons[0],photons[1]);
   std::swap(A1_pT,A2_pT);
 }
 
 // Photon cuts ----------------------------------------------------
-const double A1_eta = A1->Eta();
-const double A2_eta = A2->Eta();
+const double A1_eta = photons[0].Eta(), A2_eta = photons[1].Eta();
 
 cat_bin::id<photon_cuts>() = !(
   (A1_pT < 0.35*125.) or
@@ -250,8 +247,15 @@ auto h_Njets_incl = h_Njets;
 h_Njets_incl.integrate_left();
 hists["Njets_incl"] = h_Njets_incl;
 
-for (const auto& h : hist<1  >::all) hists[h.name] = *h;
-for (const auto& h : hist<1,0>::all) hists[h.name] = *h;
+#ifndef HIST_MAX_D
+#define HIST_MAX_D 1
+#endif
+
+#define WITH_COMMAS(z, n, text) ,text
+#define SAVE_HISTS(z, n, text) \
+  for (const auto& h : hist<1 BOOST_PP_REPEAT(n,WITH_COMMAS,0)>::all) \
+    hists[h.name] = *h;
+BOOST_PP_REPEAT(HIST_MAX_D,SAVE_HISTS,)
 
 const string ofname = runcards["output"];
 cout << "\033[36mWriting output\033[0m: " << ofname << endl;

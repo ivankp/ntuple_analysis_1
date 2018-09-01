@@ -15,17 +15,17 @@ h_(HT) h_(H_pT) h_(H_y) h_(H_eta) h_(H_phi) h_(H_mass)
 
 if (njets < njets_required) continue;
 
-const double H_pT = higgs->Pt();
+const double H_pT = higgs.Pt();
 h_H_pT(H_pT);
 
 double HT = H_pT;
-for (const auto& jet : fj_jets) HT += jet.pt();
+for (const auto& jet : jets) HT += jet.pt();
 h_HT(HT);
 
-h_H_y(higgs->Rapidity());
-h_H_eta(higgs->Eta());
-h_H_phi(higgs->Phi());
-h_H_mass(higgs->M());
+h_H_y(higgs.Rapidity());
+h_H_eta(higgs.Eta());
+h_H_phi(higgs.Phi());
+h_H_mass(higgs.M());
 
 #endif
 

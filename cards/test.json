@@ -12,7 +12,7 @@
   "jets": {
     "cuts": { "pT": 30, "eta": 4.4 },
     "alg": [ "antikt", 0.4 ],
-    "N_required": 1
+    "njets": 1
   },
   "binning": "/home/ivanp/work/ntuple_analysis/cards/Hjets.bins"
 },

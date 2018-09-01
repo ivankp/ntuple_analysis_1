@@ -12,7 +12,7 @@ Higgs2diphoton::Higgs2diphoton(seed_type seed)
 : gen(seed), phi_dist(0.,2*M_PI), cts_dist(-1.,1.)
 { }
 
-std::pair<TLorentzVector,TLorentzVector>
+Higgs2diphoton::photons_type
 Higgs2diphoton::operator()(const TLorentzVector& Higgs, bool new_kin) {
   if (new_kin) {
     phi = phi_dist(gen);
@@ -34,9 +34,9 @@ Higgs2diphoton::operator()(const TLorentzVector& Higgs, bool new_kin) {
   }
   photon *= E;
 
-  std::pair<TLorentzVector,TLorentzVector> diphoton( {photon,E}, {-photon,E} );
-  diphoton.first.Boost(boost);
-  diphoton.second.Boost(boost);
+  photons_type diphoton {{ {photon,E}, {-photon,E} }};
+  std::get<0>(diphoton).Boost(boost);
+  std::get<1>(diphoton).Boost(boost);
 
   return diphoton;
 }

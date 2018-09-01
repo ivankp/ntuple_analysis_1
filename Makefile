@@ -52,9 +52,12 @@ C_Higgs2diphoton := $(ROOT_CXXFLAGS)
 C_analyses/test := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS)
 L_analyses/test := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) -lboost_iostreams
 
+C_analyses/hist_Hjets := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS)
+L_analyses/hist_Hjets := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) -lboost_iostreams
+
 L_merge := -lboost_iostreams
 
-bin/analyses/test: \
+bin/analyses/test bin/analyses/hist_Hjets: \
   $(BLD)/ivanp/program_options/program_options.o \
   $(BLD)/ivanp/binner/re_axes.o \
   $(BLD)/glob.o \
