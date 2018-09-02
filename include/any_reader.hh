@@ -20,7 +20,7 @@
 #define ROOT_LEAF_TYPES \
   (Char_t)(UChar_t)(Short_t)(UShort_t)(Int_t)(UInt_t)(Float_t)(Double_t)(Long64_t)(ULong64_t)(Bool_t)
 
-  template <typename> constexpr const char* root_type_str();
+template <typename> constexpr const char* root_type_str();
 
 #define ROOT_TYPE_STR(r, data, T) \
   template <> \
@@ -59,12 +59,12 @@ class any_reader {
   inline auto cast() { return reinterpret_cast<reader_type<type<I>>*>(data); }
 
   template <typename F, size_t I=0>
-  inline std::enable_if_t<(I<sizeof...(Ts)-1)> call(F&& f) {
+  inline std::enable_if_t<(sizeof...(Ts)-I>1)> call(F&& f) {
     if (index==I) f(cast<I>());
     else call<F,I+1>(std::forward<F>(f));
   }
   template <typename F, size_t I=0>
-  inline std::enable_if_t<(I==sizeof...(Ts)-1)> call(F&& f) {
+  inline std::enable_if_t<(sizeof...(Ts)-I==1)> call(F&& f) {
     f(cast<I>());
   }
 

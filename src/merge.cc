@@ -56,7 +56,7 @@ Ycombinator<std::decay_t<F>> make_Ycombinator(F&& f) {
 int main(int argc, char* argv[]) {
   std::vector<const char*> ifnames;
   const char* ofname;
-  bool merge_xsec = false;
+  bool merge_xsec = false, verbose = false;
 
   try {
     using namespace ivanp::po;
@@ -65,6 +65,7 @@ int main(int argc, char* argv[]) {
       (ofname,'o',"output JSON file",req())
       (merge_xsec,{"-x","--xsec","--nlo"},
        "merge cross sections (e.g. NLO parts)")
+      (verbose,'v',"verbose")
       .parse(argc,argv,true)) return 0;
   } catch (const std::exception& e) {
     cerr << e << endl;
@@ -74,6 +75,7 @@ int main(int argc, char* argv[]) {
 
   json out;
   for (const char* ifname : ifnames) {
+    if (verbose) cout << ifname << endl;
     static bool first = true;
     json in;
     try {

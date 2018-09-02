@@ -197,8 +197,6 @@ int main(int argc, char* argv[]) {
 
   TTreeReader reader(&chain);
 
-  any_float_reader _w2(reader,"weight2");
-
   vector<any_float_reader> _weights;
   _weights.reserve(weights_names.size());
   cout << "\033[36mWeights\033[0m:\n";
@@ -224,11 +222,11 @@ int main(int argc, char* argv[]) {
 
     // TODO: add reweighting
 
-    TEST(*_weights[0])
-    TEST(*_w2)
-    TEST((*_weights[0]==*_w2))
-
-    if (ent < 10) continue; else break;
+    // TEST(*_weights[0])
+    // TEST(*_w2)
+    // TEST((*_weights[0]==*_w2))
+    //
+    // if (ent < 10) continue; else break;
 
 #define ANALYSIS_LOOP
 #include STR(ANALYSIS)

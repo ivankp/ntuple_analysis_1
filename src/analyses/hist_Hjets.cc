@@ -25,7 +25,7 @@ auto h_reserve = [&](unsigned n, auto name_f) {
 #define h_j_(X) auto h_jet_##X = h_reserve(njets_required+1, \
   [](unsigned i){ return cat("jet",i+1,"_"#X); } );
 
-h_(HT) h_(H_pT) h_(H_y) h_(H_eta) h_(H_phi) h_(H_mass)
+h_(HT) h_(H_pT) h_(H_y) h_(H_eta) h_(H_phi) h_(H_mass) h_(H_mass_hgam)
 
 h_j_(pT) h_j_(y) h_j_(eta) h_j_(phi) h_j_(mass) h_j_(tau)
 
@@ -52,6 +52,7 @@ h_H_y(H_y);
 h_H_eta(higgs.Eta());
 h_H_phi(higgs.Phi());
 h_H_mass(H_mass);
+h_H_mass_hgam(H_mass);
 
 double HT = H_pT;
 double jets_tau_max = 0, jets_tau_sum = 0;
@@ -63,12 +64,13 @@ for (unsigned j=0, nj=jets.size(); j<nj; ++j) {
   h_jet_pT  [j](jet_pT);
   h_jet_y   [j](jets[j].rapidity());
   h_jet_eta [j](jets[j].eta());
-  h_jet_phi [j](jets[j].phi());
+  h_jet_phi [j](jets[j].phi_std());
   h_jet_mass[j](jets[j].m());
 
   const auto jet_tau = tau(jets[j],H_y);
   if (jet_tau > jets_tau_max) jets_tau_max = jet_tau;
   jets_tau_sum += jet_tau;
+  h_jet_tau[j](jet_tau);
 
   Hjs += jets[j];
   h_Hjs_mass[j](Hjs.M());
