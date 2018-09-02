@@ -9,6 +9,9 @@
 #include <boost/preprocessor/seq/for_each.hpp>
 
 #include <TLeaf.h>
+#include <TTreeReader.h>
+#include <TTreeReaderValue.h>
+#include <TTreeReaderArray.h>
 
 #include "ivanp/pack.hh"
 #include "ivanp/error.hh"
@@ -28,9 +31,6 @@ BOOST_PP_SEQ_FOR_EACH(ROOT_TYPE_STR,,ROOT_LEAF_TYPES)
 template <typename... Ts>
 class any_reader {
   size_t index;
-
-  // template <typename T>
-  // constexpr size_t type_index = ivanp::type_index<T,Ts...>::value;
 
   template <size_t I>
   using type = ivanp::nth_type<I,Ts...>;
@@ -60,12 +60,12 @@ class any_reader {
 
   template <typename F, size_t I=0>
   inline std::enable_if_t<(I<sizeof...(Ts)-1)> call(F&& f) {
-    if (index==I) f(reinterpret_cast<reader_type<type<I>>*>(data));
+    if (index==I) f(cast<I>());
     else call<F,I+1>(std::forward<F>(f));
   }
   template <typename F, size_t I=0>
   inline std::enable_if_t<(I==sizeof...(Ts)-1)> call(F&& f) {
-    f(reinterpret_cast<reader_type<type<I>>*>(data));
+    f(cast<I>());
   }
 
 public:
@@ -75,14 +75,11 @@ public:
     ))
   {
     call([&](auto* p) {
-      new(p) ivanp::decay_ptr_t<decltype(p)>(reader,branch_name);
+      using T = ivanp::decay_ptr_t<decltype(p)>;
+      new(p) T(reader,branch_name);
     });
   }
   ~any_reader() {
-    // struct call_destructor {
-    //   template <typename T> void operator()(T* p) { p->~T(); }
-    // };
-    // call(call_destructor{});
     call([](auto* p) {
       using T = ivanp::decay_ptr_t<decltype(p)>;
       p->~T();

@@ -199,7 +199,7 @@ int main(int argc, char* argv[]) {
 
   any_float_reader _w2(reader,"weight2");
 
-  vector<float_or_double_value_reader> _weights;
+  vector<any_float_reader> _weights;
   _weights.reserve(weights_names.size());
   cout << "\033[36mWeights\033[0m:\n";
   for (const auto& name : weights_names) { // Make weight readers
