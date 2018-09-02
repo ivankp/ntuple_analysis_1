@@ -1,5 +1,5 @@
-#ifndef ANY_READER_HH
-#define ANY_READER_HH
+#ifndef BRANCH_READER_HH
+#define BRANCH_READER_HH
 
 #include <tuple>
 #include <algorithm>
@@ -29,16 +29,24 @@ template <typename> constexpr const char* root_type_str();
 BOOST_PP_SEQ_FOR_EACH(ROOT_TYPE_STR,,ROOT_LEAF_TYPES)
 
 template <typename... Ts>
-class any_reader {
+class branch_reader {
+public:
+  using value_type = std::common_type_t<std::remove_extent_t<Ts>...>;
+
+private:
   size_t index;
 
-  template <size_t I>
-  using type = ivanp::nth_type<I,Ts...>;
+  static constexpr bool is_array =
+    std::is_array<ivanp::nth_type<0,Ts...>>::value;
 
-  using common_type = std::common_type_t<Ts...>;
+  template <size_t I>
+  using type = ivanp::nth_type<I,std::remove_extent_t<Ts>...>;
 
   template <typename T>
-  using reader_type = TTreeReaderValue<T>;
+  using reader_type = std::conditional_t<is_array,
+    TTreeReaderArray<std::remove_extent_t<T>>,
+    TTreeReaderValue<std::remove_extent_t<T>>
+  >;
 
   char data[ std::max(sizeof(reader_type<Ts>)...) ];
 
@@ -51,7 +59,7 @@ class any_reader {
   template <size_t I=0>
   inline std::enable_if_t<(I==sizeof...(Ts)),size_t>
   get_index [[noreturn]] (const char* type_name) {
-    throw ivanp::error(ivanp::type_str<any_reader<Ts...>>(),
+    throw ivanp::error(ivanp::type_str<branch_reader<Ts...>>(),
       " cannot read ",type_name);
   }
 
@@ -69,7 +77,7 @@ class any_reader {
   }
 
 public:
-  any_reader(TTreeReader& reader, const char* branch_name)
+  branch_reader(TTreeReader& reader, const char* branch_name)
   : index(get_index(
       reader.GetTree()->GetLeaf(branch_name)->GetTypeName()
     ))
@@ -79,16 +87,22 @@ public:
       new(p) T(reader,branch_name);
     });
   }
-  ~any_reader() {
+  ~branch_reader() {
     call([](auto* p) {
       using T = ivanp::decay_ptr_t<decltype(p)>;
       p->~T();
     });
   }
 
-  inline common_type operator*() {
-    common_type x;
+  inline value_type operator*() {
+    value_type x;
     call([&](auto* p){ x = **p; });
+    return x;
+  }
+
+  inline value_type operator[](size_t i) {
+    value_type x;
+    call([&,i](auto* p){ x = (*p)[i]; });
     return x;
   }
 
@@ -99,6 +113,31 @@ public:
   }
 };
 
-using any_float_reader = any_reader<double,float>;
+using float_reader = branch_reader<double,float>;
+using floats_reader = branch_reader<double[],float>;
+
+template <typename T>
+class branch_reader<T>: std::conditional_t<
+  std::is_array<T>::value,
+  TTreeReaderArray<std::remove_extent_t<T>>,
+  TTreeReaderValue<T>>
+{
+public:
+  using value_type = std::remove_extent_t<T>;
+
+private:
+  using base_type = std::conditional_t<
+    std::is_array<T>::value,
+    TTreeReaderArray<value_type>,
+    TTreeReaderValue<value_type>>;
+
+public:
+  using base_type::base_type;
+  using base_type::GetBranchName;
+
+  inline value_type operator*() { return **this; }
+
+  inline value_type operator[](size_t i) { return (*this)[i]; }
+};
 
 #endif

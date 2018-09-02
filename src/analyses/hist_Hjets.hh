@@ -71,20 +71,20 @@ TLorentzVector& operator+=(TLorentzVector& a, const fastjet::PseudoJet& b) {
 #endif
 #ifdef ANALYSIS_INIT // =============================================
 
-TTreeReaderValue<Int_t> _id(reader,"id");
-TTreeReaderValue<Int_t> _nparticle(reader,"nparticle");
-TTreeReaderArray<Int_t> _kf(reader,"kf");
+branch_reader<Int_t> _id(reader,"id");
+branch_reader<Int_t> _nparticle(reader,"nparticle");
+branch_reader<Int_t[]> _kf(reader,"kf");
 
-float_or_double_array_reader
-  _px(reader,"px"), _py(reader,"py"), _pz(reader,"pz"), _E (reader,"E");
+floats_reader
+  _px(reader,"px"), _py(reader,"py"), _pz(reader,"pz"), _E(reader,"E");
 
-boost::optional<TTreeReaderValue<Int_t>> _ncount;
+boost::optional<branch_reader<Int_t>> _ncount;
 for ( auto bo : *reader.GetTree()->GetListOfBranches() ) {
   if (!strcmp(bo->GetName(),"ncount")) {
     _ncount.emplace(reader,"ncount"); break;
   }
 }
-TTreeReaderValue<Int_t> _id1(reader,"id1"), _id2(reader,"id2");
+branch_reader<Int_t> _id1(reader,"id1"), _id2(reader,"id2");
 
 const auto& conf = runcards.at("analysis");
 const unsigned njets_required = conf.value("/jets/njets"_jp,0);
