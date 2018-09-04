@@ -195,19 +195,31 @@ int main(int argc, char* argv[]) {
 
   TTreeReader reader(&chain);
 
+  // Make weight readers
   vector<float_reader> _weights;
   _weights.reserve(weights_names.size());
   cout << "\033[36mWeights\033[0m:\n";
-  for (const auto& name : weights_names) { // Make weight readers
+  for (const auto& name : weights_names) {
     cout << "  " << name << endl;
     _weights.emplace_back(reader,name.c_str());
   }
 
+  // Make reweighters
   const auto& reweighting = runcards.at("reweighting");
   vector<reweighter> reweighters;
   reweighters.reserve(reweighting.size());
   for (const auto& j : reweighting)
     reweighters.emplace_back(reader,j);
+
+  // Reserve weights vector
+  vector<double> weights(std::accumulate(
+    reweighters.begin(), reweighters.end(), _weights.size(),
+    [](unsigned n, auto& rew){ return n + rew.nweights(); }
+  ));
+
+  for (auto& rew : reweighters) // get weights names
+    for (unsigned i=0; i<rew.nweights(); ++i)
+      weights_names.emplace_back(rew.weight_name(i));
 
 #define ANALYSIS_INIT
 #include STR(ANALYSIS)
@@ -223,8 +235,15 @@ int main(int argc, char* argv[]) {
           : reader.GetEntries(true)
         ); reader.Next(); ++ent)
   {
-
-    // TODO: add reweighting
+    { unsigned wi = 0;
+      for (; wi<_weights.size(); ++wi)
+        weights[wi] = *_weights[wi];
+      for (auto& rew : reweighters) {
+        rew(); // reweight this event
+        for (unsigned i=0; i<rew.nweights(); ++i, ++wi)
+          weights[i] = rew[i];
+      }
+    }
 
     // TEST(*_weights[0])
     // TEST(*_w2)

@@ -94,7 +94,7 @@ cout << "\033[36mBinning\033[0m: " << bfname << '\n' << endl;
 re_axes ra(bfname);
 
 // Define histograms ==============================================
-bin_t::weights.resize(_weights.size());
+bin_t::weights.resize(weights.size());
 
 ivanp::binner<bin_t, std::tuple<ivanp::axis_spec<
     ivanp::uniform_axis<int>,0,1
@@ -141,8 +141,8 @@ cout << "\033[36mNjets\033[0m >= " << njets_required << endl;
 const size_t np = *_nparticle;
 partons.clear();
 
-for (unsigned i=_weights.size(); i--; ) // set weights
-  bin_t::weights[i] = *_weights[i];
+for (unsigned i=weights.size(); i--; ) // set weights
+  bin_t::weights[i] = weights[i];
 
 // Keep track of multi-entry events -------------------------------
 ++num_entries;

@@ -133,10 +133,10 @@ struct reweighter_impl: branches {
     double fxQ(int id, double x) const {
       return pdf->xfxQ(id, x, muF)/x;
     }
-    double fr(unsigned r) const {
+    double f(unsigned r) const {
       return fxQ(id[r],x[r]);
     }
-    double fr1(unsigned r) const {
+    double f1(unsigned r) const {
       if (id[r] != 21) return fxQ(id[r],x[r]);
       else {
         double f = 0.;
@@ -144,7 +144,7 @@ struct reweighter_impl: branches {
         return f;
       }
     };
-    double fr2(unsigned r) const {
+    double f2(unsigned r) const {
       if (id[r] != 21) return fxQ(id[r],x[r]/xp[r],x[r]);
       else {
         double f = 0.;
@@ -152,10 +152,10 @@ struct reweighter_impl: branches {
         return f;
       }
     };
-    double fr3(unsigned r) const {
+    double f3(unsigned r) const {
       return fxQ(21,x[r]);
     }
-    double fr4(unsigned r) const {
+    double f4(unsigned r) const {
       return fxQ(21,x[r]/xp[r],x[r]);
     }
   } fc;
@@ -165,7 +165,7 @@ struct reweighter_impl: branches {
     fc.id  = { *id1, *id2 };
     fc.x   = { * x1, * x2 };
 
-    const double f[2] = { fc.fr(0), fc.fr(1) };
+    const double f[2] = { fc.f(0), fc.f(1) };
     vars.ff = f[0]*f[1];
 
     if (part[0]=='I') {
@@ -174,10 +174,10 @@ struct reweighter_impl: branches {
       double w[8];
       for (int i=0; i<8; ++i) w[i] = usr_wgts[i+2] + usr_wgts[i+10]*lf;
 
-      vars.m = ( fc.fr1(0)*w[0] + fc.fr2(0)*w[1]
-               + fc.fr3(0)*w[2] + fc.fr4(0)*w[3] )*f[1]
-             + ( fc.fr1(1)*w[4] + fc.fr2(1)*w[5]
-               + fc.fr3(1)*w[6] + fc.fr4(1)*w[7] )*f[0];
+      vars.m = ( fc.f1(0)*w[0] + fc.f2(0)*w[1]
+               + fc.f3(0)*w[2] + fc.f4(0)*w[3] )*f[1]
+             + ( fc.f1(1)*w[4] + fc.f2(1)*w[5]
+               + fc.f3(1)*w[6] + fc.f4(1)*w[7] )*f[0];
     } else vars.m = 0.;
   }
 
@@ -262,6 +262,7 @@ void reweighter::args_struct::add_scale(
   Ki.push_back(ki);
 }
 
+void reweighter::operator()() { (*impl)(); }
 unsigned reweighter::nweights() const {
   return impl->weights.size();
 }

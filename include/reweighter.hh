@@ -27,6 +27,7 @@ public:
   reweighter(TTreeReader& reader, args_struct args);
   ~reweighter();
 
+  void operator()();
   unsigned nweights() const;
   double operator[](unsigned i) const;
   std::string weight_name(unsigned i) const;
