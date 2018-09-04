@@ -13,7 +13,10 @@
 
 #include <LHAPDF/LHAPDF.h>
 
+#include "ivanp/error.hh"
 #include "branch_reader.hh"
+
+using boost::optional;
 
 #define REWEIGHTING_BRANCHES \
   ((Int_t)(nparticle)) \
@@ -73,29 +76,46 @@ make_pdfs(const std::string& name, bool variations) {
   }
 }
 
-std::map<
-  std::string,
-  std::function<double(double k, branches& b)>
-> scale_functions {
-};
-
 struct reweighter_impl: branches {
-
   reweighter::args_struct args;
+
   const std::vector<std::unique_ptr<LHAPDF::PDF>> pdfs;
   LHAPDF::PDF *pdf = nullptr;
 
-  decltype(scale_functions)::mapped_type& scale_f;
+  using scale_function = std::function<double(branches& b)>;
+  static std::map<std::string, scale_function> scale_functions;
+  static scale_function& get_scale_fcn(const std::string& name) {
+    try {
+      return scale_functions.at(name);
+    } catch (const std::exception& e) {
+      throw ivanp::error("cannot find scale function \"",name,'\"');
+    }
+  }
+  scale_function& scale_f;
 
-  std::vector<double> scale_values;
-  std::vector<unsigned> Kri, Kfi;
+  double scale_base_value;
 
-  struct ren_vars_struct { double ar, w0; };
-  struct fac_vars_struct { double  m, ff; };
+  // TODO: these are not correctly indexed
+  struct ren_vars_struct { double k, ar, w0; };
+  struct fac_vars_struct { double k,  m, ff; };
   std::vector<ren_vars_struct> ren_vars;
   std::vector<fac_vars_struct> fac_vars;
-
   std::vector<double> weights;
+
+  reweighter_impl(TTreeReader& reader, reweighter::args_struct args)
+  : branches(reader),
+    args(std::move(args)),
+    pdfs(make_pdfs(args.pdf,args.pdf_var)),
+    scale_f(get_scale_fcn(args.scale)),
+    scale_base_value(),
+    ren_vars(args.Kr.size()), fac_vars(args.Kf.size()),
+    weights(args.Ki.size()+pdfs.size()-1)
+  {
+    for (unsigned i=0; i<args.Kr.size(); ++i)
+      ren_vars[i].k = args.Kr[i];
+    for (unsigned i=0; i<args.Kf.size(); ++i)
+      fac_vars[i].k = args.Kf[i];
+  }
 
   struct fac_calc_struct {
     LHAPDF::PDF *pdf;
@@ -140,14 +160,13 @@ struct reweighter_impl: branches {
     }
   } fc;
 
-  void fac_calc(unsigned i) {
-    auto& v = fac_vars[i];
-    fc.muF = scale_values[i];
+  void fac_calc(fac_vars_struct& vars) {
+    fc.muF = scale_base_value * vars.k;
     fc.id  = { *id1, *id2 };
     fc.x   = { * x1, * x2 };
 
     const double f[2] = { fc.fr(0), fc.fr(1) };
-    v.ff = f[0]*f[1];
+    vars.ff = f[0]*f[1];
 
     if (part[0]=='I') {
       fc.xp = { *x1p, *x2p };
@@ -155,36 +174,34 @@ struct reweighter_impl: branches {
       double w[8];
       for (int i=0; i<8; ++i) w[i] = usr_wgts[i+2] + usr_wgts[i+10]*lf;
 
-      v.m = ( fc.fr1(0)*w[0] + fc.fr2(0)*w[1]
-            + fc.fr3(0)*w[2] + fc.fr4(0)*w[3] )*f[1]
-          + ( fc.fr1(1)*w[4] + fc.fr2(1)*w[5]
-            + fc.fr3(1)*w[6] + fc.fr4(1)*w[7] )*f[0];
-    } else v.m = 0.;
+      vars.m = ( fc.fr1(0)*w[0] + fc.fr2(0)*w[1]
+               + fc.fr3(0)*w[2] + fc.fr4(0)*w[3] )*f[1]
+             + ( fc.fr1(1)*w[4] + fc.fr2(1)*w[5]
+               + fc.fr3(1)*w[6] + fc.fr4(1)*w[7] )*f[0];
+    } else vars.m = 0.;
   }
 
-  void ren_calc(unsigned i) {
-    auto& v = ren_vars[i];
-    const double muR = scale_values[i];
+  void ren_calc(ren_vars_struct& vars) {
+    const double muR = scale_base_value * vars.k;
 
-    v.ar = std::pow(pdf->alphasQ(muR)/(*alphas), (*alphasPower));
+    vars.ar = std::pow(pdf->alphasQ(muR)/(*alphas), (*alphasPower));
 
     if (part[0]=='V' || part[0]=='I') {
       const double lr = 2.*std::log(muR/(*ren_scale));
-      v.w0 = (*me_wgt) + lr*usr_wgts[0] + 0.5*lr*lr*usr_wgts[1];
+      vars.w0 = (*me_wgt) + lr*usr_wgts[0] + 0.5*lr*lr*usr_wgts[1];
     } else {
-      v.w0 = *me_wgt2;
+      vars.w0 = *me_wgt2;
     }
   }
 
-  double combine(unsigned i) { // i is scale index
-    const auto& scale = args.Ki[i];
+  double combine(const reweighter::ren_fac<unsigned>& ki) {
     double w;
 
-    if (scale.fac) {
-      const auto& fac = fac_vars[*scale.fac];
+    if (ki.fac) {
+      const auto& fac = fac_vars[*ki.fac];
       w = fac.m;
-      if (scale.ren) {
-        const auto& ren = ren_vars[*scale.ren];
+      if (ki.ren) {
+        const auto& ren = ren_vars[*ki.ren];
         w += ren.w0 * fac.ff;
       } else {
         w += (*me_wgt2) * fac.ff;
@@ -192,8 +209,8 @@ struct reweighter_impl: branches {
     } else {
       w = *weight2;
     }
-    if (scale.ren) {
-      const auto& ren = ren_vars[*scale.ren];
+    if (ki.ren) {
+      const auto& ren = ren_vars[*ki.ren];
       w *= ren.ar;
     }
 
@@ -201,47 +218,23 @@ struct reweighter_impl: branches {
   }
 
   void operator()() {
-    for (unsigned i=0; i<args.K.size(); ++i)
-      scale_values[i] = scale_f(args.K[i],*this);
+    scale_base_value = scale_f(*this);
 
     pdf = fc.pdf = pdfs[0].get();
-    for (unsigned i : Kri) ren_calc(i);
-    for (unsigned i : Kfi) fac_calc(i);
+    for (auto& vars : ren_vars) ren_calc(vars);
+    for (auto& vars : fac_vars) fac_calc(vars);
 
     // scale variations
     for (unsigned i=0; i<args.Ki.size(); ++i)
-      weights[i] = combine(i);
+      weights[i] = combine(args.Ki[i]);
 
     // pdf variations
     for (unsigned i=1; i<pdfs.size(); ++i) {
       pdf = fc.pdf = pdfs[i].get();
-      fac_calc(0);
-      ren_calc(0);
-      weights[args.Ki.size()+i] = combine(0);
+      ren_calc(ren_vars[0]);
+      fac_calc(fac_vars[0]);
+      weights[args.Ki.size()+i] = combine(args.Ki[0]);
     }
-  }
-
-  reweighter_impl(TTreeReader& reader, reweighter::args_struct args)
-  : branches(reader),
-    args(std::move(args)),
-    pdfs(make_pdfs(args.pdf,args.pdf_var)),
-    scale_f(scale_functions[args.scale]),
-    scale_values(args.K.size()), Kri(), Kfi(),
-    ren_vars(), fac_vars(),
-    weights(args.Ki.size()+pdfs.size()-1)
-  {
-    Kri.reserve(args.K.size());
-    Kfi.reserve(args.K.size());
-    for (const auto& ki : args.Ki) {
-      if (ki.ren)
-        if (std::find(Kri.begin(),Kri.end(),*ki.ren)!=Kri.end())
-          Kri.push_back(*ki.ren);
-      if (ki.fac)
-        if (std::find(Kfi.begin(),Kfi.end(),*ki.ren)!=Kfi.end())
-          Kfi.push_back(*ki.fac);
-    }
-    ren_vars.resize(Kri.size());
-    fac_vars.resize(Kfi.size());
   }
 };
 
@@ -249,26 +242,23 @@ reweighter::reweighter(TTreeReader& reader, args_struct args)
 : impl(new reweighter_impl(reader, std::move(args))) { }
 reweighter::~reweighter() { delete impl; }
 
-void reweighter::args_struct::add_scale(const ren_fac<double>& k) {
+void reweighter::args_struct::add_scale(
+  const ren_fac<double>& k
+) {
   ren_fac<unsigned> ki { };
-  if (k.ren) {
-    auto it = std::find(K.begin(), K.end(), *k.ren);
-    if (it==K.end()) {
-      ki.ren = K.size();
-      K.push_back(*k.ren);
-    } else {
-      ki.ren = it - K.begin();
+  auto fcn = [&](auto& K, auto t) {
+    if (t(k)) {
+      auto it = std::find(K.begin(), K.end(), *t(k));
+      if (it==K.end()) {
+        t(ki) = K.size();
+        K.push_back(*t(k));
+      } else {
+        t(ki) = it - K.begin();
+      }
     }
-  }
-  if (k.fac) {
-    auto it = std::find(K.begin(), K.end(), *k.fac);
-    if (it==K.end()) {
-      ki.fac = K.size();
-      K.push_back(*k.fac);
-    } else {
-      ki.fac = it - K.begin();
-    }
-  }
+  };
+  fcn(Kr, [](auto& x) -> auto& { return x.ren; });
+  fcn(Kf, [](auto& x) -> auto& { return x.fac; });
   Ki.push_back(ki);
 }
 
@@ -278,8 +268,20 @@ unsigned reweighter::nweights() const {
 double reweighter::operator[](unsigned i) const {
   return impl->weights[i];
 }
-std::string reweighter::name(unsigned i) const {
+std::string reweighter::weight_name(unsigned i) const {
   const auto *pdf = impl->pdfs[i].get();
-  return pdf->set().name() + "_" + std::to_string(pdf->memberID());
+  return ivanp::cat(
+    pdf->set().name(), '_',
+    pdf->memberID(), '_',
+    impl->args.scale
+    // '_',
+    // "ren", impl->args.K[impl->args.Ki[i].ren], '_',
+    // "fac", impl->args.K[impl->args.Ki[i].fac]
+  );
 }
+
+decltype(reweighter_impl::scale_functions)
+reweighter_impl::scale_functions {
+
+};
 
