@@ -18,7 +18,8 @@
 #include "ivanp/debug/type_str.hh"
 
 #define ROOT_LEAF_TYPES \
-  (Char_t)(UChar_t)(Short_t)(UShort_t)(Int_t)(UInt_t)(Float_t)(Double_t)(Long64_t)(ULong64_t)(Bool_t)
+  (Char_t)(UChar_t)(Short_t)(UShort_t)(Int_t)(UInt_t)\
+  (Float_t)(Double_t)(Long64_t)(ULong64_t)(Bool_t)
 
 template <typename> constexpr const char* root_type_str();
 
@@ -33,11 +34,11 @@ class branch_reader {
 public:
   using value_type = std::common_type_t<std::remove_extent_t<Ts>...>;
 
-private:
-  size_t index;
-
   static constexpr bool is_array =
     std::is_array<ivanp::nth_type<0,Ts...>>::value;
+
+private:
+  size_t index;
 
   template <size_t I>
   using type = ivanp::nth_type<I,std::remove_extent_t<Ts>...>;
@@ -125,9 +126,11 @@ class branch_reader<T>: std::conditional_t<
 public:
   using value_type = std::remove_extent_t<T>;
 
+  static constexpr bool is_array = std::is_array<T>::value;
+
 private:
   using base_type = std::conditional_t<
-    std::is_array<T>::value,
+    is_array,
     TTreeReaderArray<value_type>,
     TTreeReaderValue<value_type>>;
 

@@ -10,6 +10,7 @@
 #include <TFile.h>
 #include <TChain.h>
 #include "branch_reader.hh"
+#include "reweighter.hh"
 
 #include "json/nlohmann.hpp"
 #include "json/print_value_t.hh"

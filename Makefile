@@ -49,20 +49,9 @@ all: $(EXES)
 # -------------------------------------------------------------------
 C_Higgs2diphoton := $(ROOT_CXXFLAGS)
 
-C_analyses/test := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS)
-L_analyses/test := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) -lboost_iostreams
-
-C_analyses/hist_Hjets := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS)
-L_analyses/hist_Hjets := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) -lboost_iostreams
+C_reweighter := $(ROOT_CXXFLAGS) $(LHAPDF_CXXFLAGS)
 
 L_merge := -lboost_iostreams
-
-bin/analyses/test bin/analyses/hist_Hjets: \
-  $(BLD)/ivanp/program_options/program_options.o \
-  $(BLD)/ivanp/binner/re_axes.o \
-  $(BLD)/glob.o \
-  $(BLD)/copy_file.o \
-  $(BLD)/Higgs2diphoton.o
 
 bin/merge: \
   $(BLD)/ivanp/program_options/program_options.o
@@ -79,6 +68,20 @@ $(BLD)/%.o:
 bin/%: $(BLD)/%.o
 	@mkdir -pv $(dir $@)
 	$(CXX) $(LDFLAGS) $(filter %.o,$^) -o $@ $(LDLIBS) $(L_$*)
+
+$(BLD)/analyses/%.o:
+	@mkdir -pv $(dir $@)
+	$(CXX) $(CXXFLAGS) $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS) -c $(filter %$(EXT),$^) -o $@
+
+bin/analyses/%: $(BLD)/analyses/%.o \
+  $(BLD)/ivanp/program_options/program_options.o \
+  $(BLD)/ivanp/binner/re_axes.o \
+  $(BLD)/glob.o \
+  $(BLD)/copy_file.o \
+  $(BLD)/Higgs2diphoton.o \
+  $(BLD)/reweighter.o
+	@mkdir -pv $(dir $@)
+	$(CXX) $(LDFLAGS) $(filter %.o,$^) -o $@ $(LDLIBS) $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS) -lboost_iostreams
 
 endif
 
