@@ -15,6 +15,7 @@
 #include "json/nlohmann.hpp"
 #include "json/print_value_t.hh"
 #include "json/std_regex.hh"
+#include "json/reweighter.hh"
 
 #include "ivanp/string.hh"
 #include "ivanp/root/tkey.hh"
@@ -201,6 +202,12 @@ int main(int argc, char* argv[]) {
     cout << "  " << name << endl;
     _weights.emplace_back(reader,name.c_str());
   }
+
+  const auto& reweighting = runcards.at("reweighting");
+  vector<reweighter> reweighters;
+  reweighters.reserve(reweighting.size());
+  for (const auto& j : reweighting)
+    reweighters.emplace_back(reader,j);
 
 #define ANALYSIS_INIT
 #include STR(ANALYSIS)
