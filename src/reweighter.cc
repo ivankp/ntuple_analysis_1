@@ -156,7 +156,6 @@ struct reweighter_impl: event {
   } fc;
 
   void fac_calc(fac_vars_struct& vars) {
-    TEST(__PRETTY_FUNCTION__)
     fc.muF = scale_base_value * vars.k;
     fc.id  = { *id1, *id2 };
     fc.x   = { * x1, * x2 };
@@ -178,7 +177,6 @@ struct reweighter_impl: event {
   }
 
   void ren_calc(ren_vars_struct& vars) {
-    TEST(__PRETTY_FUNCTION__)
     const double muR = scale_base_value * vars.k;
 
     vars.ar = std::pow(pdf->alphasQ(muR)/(*alphas), (*alphasPower));
@@ -192,7 +190,6 @@ struct reweighter_impl: event {
   }
 
   double combine(const reweighter::ren_fac<unsigned>& ki) {
-    TEST(__PRETTY_FUNCTION__)
     double w;
 
     if (ki.fac) {
@@ -217,7 +214,6 @@ struct reweighter_impl: event {
 
   void operator()() {
     scale_base_value = scale_f(*this);
-    TEST(__PRETTY_FUNCTION__)
 
     pdf = fc.pdf = pdfs[0].get();
     for (auto& vars : ren_vars) ren_calc(vars);
@@ -236,6 +232,7 @@ struct reweighter_impl: event {
     }
   }
 };
+constexpr std::array<int,10> reweighter_impl::fac_calc_struct::quarks;
 
 reweighter::reweighter(TTreeReader& reader, args_struct args)
 : impl(new reweighter_impl(reader, std::move(args))) { }
@@ -284,9 +281,7 @@ using namespace ivanp::math;
 decltype(reweighter_impl::scale_functions)
 reweighter_impl::scale_functions {
   {"HT\'/2", [](event& e){
-    TEST(__PRETTY_FUNCTION__)
     double HT = 0.;
-    TEST((*e.nparticle))
     for (int i=0, n=*e.nparticle; i<n; ++i)
       HT += std::sqrt( e.kf[i]==25
           ? sq(e.E[i])-sq(e.pz[i]) // ET for Higgs
@@ -294,7 +289,7 @@ reweighter_impl::scale_functions {
     return 0.5*HT;
   }},
   {"HT\'\'", [](event& e){
-    double HT = 0., mH;
+    double HT = 0., mH = 0;
     for (int i=0, n=*e.nparticle; i<n; ++i) {
       HT += std::sqrt( sq(e.px[i],e.py[i]) ); // pT
       if (e.kf[i]==25)

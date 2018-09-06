@@ -198,9 +198,7 @@ int main(int argc, char* argv[]) {
   // Make weight readers
   vector<float_reader> _weights;
   _weights.reserve(weights_names.size());
-  cout << "\033[36mWeights\033[0m:\n";
   for (const auto& name : weights_names) {
-    cout << "  " << name << endl;
     _weights.emplace_back(reader,name.c_str());
   }
 
@@ -223,6 +221,12 @@ int main(int argc, char* argv[]) {
     for (unsigned i=0; i<rew.nweights(); ++i)
       weights_names.emplace_back(rew.weight_name(i));
 
+  // Print weights names
+  cout << "\033[36mWeights\033[0m:\n";
+  for (const auto& name : weights_names) {
+    cout << "  " << name << endl;
+  }
+
 #define ANALYSIS_INIT
 #include STR(ANALYSIS)
 #undef ANALYSIS_INIT
@@ -243,7 +247,7 @@ int main(int argc, char* argv[]) {
       for (auto& rew : reweighters) {
         rew(); // reweight this event
         for (unsigned i=0; i<rew.nweights(); ++i, ++wi)
-          weights[i] = rew[i];
+          weights[wi] = rew[i];
       }
     }
 

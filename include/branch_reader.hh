@@ -118,11 +118,7 @@ using float_reader = branch_reader<double,float>;
 using floats_reader = branch_reader<double[],float>;
 
 template <typename T>
-class branch_reader<T>: std::conditional_t<
-  std::is_array<T>::value,
-  TTreeReaderArray<std::remove_extent_t<T>>,
-  TTreeReaderValue<T>>
-{
+class branch_reader<T> {
 public:
   using value_type = std::remove_extent_t<T>;
 
@@ -134,13 +130,17 @@ private:
     TTreeReaderArray<value_type>,
     TTreeReaderValue<value_type>>;
 
+  base_type x;
+
 public:
-  using base_type::base_type;
-  using base_type::GetBranchName;
+  branch_reader(TTreeReader& reader, const char* branch_name)
+  : x(reader,branch_name) { }
 
-  inline value_type operator*() { return **this; }
+  inline const char* GetBranchName() const { return x.GetBranchName(); }
 
-  inline value_type operator[](size_t i) { return (*this)[i]; }
+  inline value_type operator*() { return *x; }
+
+  inline value_type operator[](size_t i) { return x[i]; }
 };
 
 #endif
