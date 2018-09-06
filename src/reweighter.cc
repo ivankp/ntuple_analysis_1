@@ -96,6 +96,18 @@ struct reweighter_impl: event {
   std::vector<ren_vars_struct> ren_vars;
   std::vector<fac_vars_struct> fac_vars;
   std::vector<double> weights;
+  std::vector<std::string> weights_names;
+
+  std::string make_weight_name(
+    const std::string& scale, unsigned ki, unsigned pdfi
+  ) {
+    auto* pdf = pdfs[pdfi].get();
+    std::stringstream ss;
+    ss << scale << '-' << pdf->set().name() << ':' << pdf->memberID();
+    if (args.Ki[ki].ren) ss << "-ren:" << args.Kr[*args.Ki[ki].ren];
+    if (args.Ki[ki].fac) ss << "-fac:" << args.Kf[*args.Ki[ki].fac];
+    return ss.str();
+  }
 
   reweighter_impl(TTreeReader& reader, reweighter::args_struct _args)
   : event(reader),
@@ -104,12 +116,16 @@ struct reweighter_impl: event {
     scale_f(get_scale_fcn(args.scale)),
     scale_base_value(),
     ren_vars(args.Kr.size()), fac_vars(args.Kf.size()),
-    weights(args.Ki.size()+pdfs.size()-1)
+    weights(args.Ki.size()+pdfs.size()-1), weights_names()
   {
-    for (unsigned i=0; i<args.Kr.size(); ++i)
-      ren_vars[i].k = args.Kr[i];
-    for (unsigned i=0; i<args.Kf.size(); ++i)
-      fac_vars[i].k = args.Kf[i];
+    for (unsigned i=0; i<args.Kr.size(); ++i) ren_vars[i].k = args.Kr[i];
+    for (unsigned i=0; i<args.Kf.size(); ++i) fac_vars[i].k = args.Kf[i];
+
+    weights_names.reserve(weights.size());
+    for (unsigned i=0; i<args.Ki.size(); ++i) // scale variations
+      weights_names.emplace_back(make_weight_name(args.scale,i,0));
+    for (unsigned i=1; i<pdfs.size(); ++i) // pdf variations
+      weights_names.emplace_back(make_weight_name(args.scale,0,i));
   }
 
   struct fac_calc_struct {
@@ -266,21 +282,14 @@ double reweighter::operator[](unsigned i) const {
   return impl->weights[i];
 }
 std::string reweighter::weight_name(unsigned i) const {
-  const auto *pdf = impl->pdfs[i].get();
-  std::stringstream ss;
-  if (impl->args.Ki[i].ren)
-    ss << "_ren" << impl->args.Kr[*impl->args.Ki[i].ren];
-  if (impl->args.Ki[i].fac)
-    ss <<  "_fac" << impl->args.Kf[*impl->args.Ki[i].fac];
-
-  return ss.str();
+  return impl->weights_names[i];
 }
 
 using namespace ivanp::math;
 
 decltype(reweighter_impl::scale_functions)
 reweighter_impl::scale_functions {
-  {"HT\'/2", [](event& e){
+  {"HT1", [](event& e){
     double HT = 0.;
     for (int i=0, n=*e.nparticle; i<n; ++i)
       HT += std::sqrt( e.kf[i]==25
@@ -288,7 +297,7 @@ reweighter_impl::scale_functions {
           : sq(e.px[i],e.py[i]) ); // pT
     return 0.5*HT;
   }},
-  {"HT\'\'", [](event& e){
+  {"HT2", [](event& e){
     double HT = 0., mH = 0;
     for (int i=0, n=*e.nparticle; i<n; ++i) {
       HT += std::sqrt( sq(e.px[i],e.py[i]) ); // pT
