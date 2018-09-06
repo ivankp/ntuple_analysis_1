@@ -8,9 +8,9 @@
   "weights": "weight.*"
 }],
 "entry_range": [0,0],
-"reweighting": [
+"eweighting": [
   { "pdf": "CT10nlo",
-    "pdf_var": true,
+    "pdf_var": false,
     "scale": "HT'/2",
     "ren_fac": [ [1,1],[0.5,0.5],[1,0.5],[0.5,1],[2,1],[1,2],[2,2] ]
   }

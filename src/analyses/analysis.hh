@@ -205,11 +205,13 @@ int main(int argc, char* argv[]) {
   }
 
   // Make reweighters
-  const auto& reweighting = runcards.at("reweighting");
   vector<reweighter> reweighters;
-  reweighters.reserve(reweighting.size());
-  for (const auto& j : reweighting)
-    reweighters.emplace_back(reader,j);
+  const auto reweighting = runcards.find("reweighting");
+  if (reweighting!=runcards.end()) {
+    reweighters.reserve(reweighting->size());
+    for (const auto& j : *reweighting)
+      reweighters.emplace_back(reader,j);
+  }
 
   // Reserve weights vector
   vector<double> weights(std::accumulate(

@@ -5,63 +5,57 @@
 #include <map>
 #include <functional>
 
-#include <boost/preprocessor/stringize.hpp>
-#include <boost/preprocessor/seq/for_each.hpp>
-#include <boost/preprocessor/seq/enum.hpp>
-#include <boost/preprocessor/seq/transform.hpp>
-#include <boost/preprocessor/seq/variadic_seq_to_seq.hpp>
-
 #include <LHAPDF/LHAPDF.h>
 
 #include "ivanp/error.hh"
+#include "ivanp/math/math.hh"
 #include "branch_reader.hh"
+
+#define TEST(var) \
+  std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;
 
 using boost::optional;
 
-#define REWEIGHTING_BRANCHES \
-  ((Int_t)(nparticle)) \
-  ((Double_t[],Float_t)(px)) \
-  ((Double_t[],Float_t)(py)) \
-  ((Double_t[],Float_t)(pz)) \
-  ((Double_t[],Float_t)(E)) \
-  ((Int_t[])(kf)) \
-  ((Double_t)(alphas)) \
-  ((Double_t)(weight2)) \
-  ((Double_t)(me_wgt)) \
-  ((Double_t)(me_wgt2)) \
-  ((Double_t)(x1)) \
-  ((Double_t)(x2)) \
-  ((Double_t)(x1p)) \
-  ((Double_t)(x2p)) \
-  ((Int_t)(id1)) \
-  ((Int_t)(id2)) \
-  ((Double_t)(fac_scale)) \
-  ((Double_t)(ren_scale)) \
-  ((Double_t[])(usr_wgts)) \
-  ((Char_t)(alphasPower)) \
-  ((Char_t[])(part))
+struct event {
+  branch_reader<Int_t> nparticle;
+  branch_reader<Double_t[],Float_t> px, py, pz, E;
+  branch_reader<Int_t[]> kf;
+  branch_reader<Double_t> alphas;
+  branch_reader<Double_t> weight2;
+  branch_reader<Double_t> me_wgt;
+  branch_reader<Double_t> me_wgt2;
+  branch_reader<Double_t> x1;
+  branch_reader<Double_t> x2;
+  branch_reader<Double_t> x1p;
+  branch_reader<Double_t> x2p;
+  branch_reader<Int_t> id1;
+  branch_reader<Int_t> id2;
+  branch_reader<Double_t> fac_scale;
+  branch_reader<Double_t> ren_scale;
+  branch_reader<Double_t[]> usr_wgts;
+  branch_reader<Char_t> alphasPower;
+  branch_reader<Char_t[]> part;
 
-#define PP_EXPAND(...) __VA_ARGS__
-#define STRIP(X) PP_EXPAND( PP_EXPAND X )
-
-#define SEQ_ELEM(I,SEQ) \
-  STRIP(BOOST_PP_SEQ_ELEM(I,BOOST_PP_VARIADIC_SEQ_TO_SEQ(SEQ)))
-
-struct branches {
-#define MAKE_BRANCH_READER(r, data, x) \
-  branch_reader<SEQ_ELEM(0,x)> SEQ_ELEM(1,x);
-
-  BOOST_PP_SEQ_FOR_EACH(MAKE_BRANCH_READER,,REWEIGHTING_BRANCHES)
-#undef MAKE_BRANCH_READER
-
-#define MAKE_BRANCH_READER(r, data, x) \
-  SEQ_ELEM(1,x)( reader, BOOST_PP_STRINGIZE(SEQ_ELEM(1,x)) )
-
-  branches(TTreeReader& reader)
-  : BOOST_PP_SEQ_ENUM(
-      BOOST_PP_SEQ_TRANSFORM(MAKE_BRANCH_READER,,REWEIGHTING_BRANCHES))
+  event(TTreeReader& reader)
+  : nparticle(reader,"nparticle"),
+    px(reader,"px"), py(reader,"py"), pz(reader,"pz"), E(reader,"E"),
+    kf(reader,"kf"),
+    alphas(reader,"alphas"),
+    weight2(reader,"weight2"),
+    me_wgt(reader,"me_wgt.me_wtg"),
+    me_wgt2(reader,"me_wgt2.me_wtg2"),
+    x1(reader,"x1"),
+    x2(reader,"x2"),
+    x1p(reader,"x1p"),
+    x2p(reader,"x2p"),
+    id1(reader,"id1"),
+    id2(reader,"id2"),
+    fac_scale(reader,"fac_scale"),
+    ren_scale(reader,"ren_scale"),
+    usr_wgts(reader,"usr_wgts"),
+    alphasPower(reader,"alphasPower"),
+    part(reader,"part")
   { }
-#undef MAKE_BRANCH_READER
 };
 
 std::vector<std::unique_ptr<LHAPDF::PDF>>
@@ -76,13 +70,14 @@ make_pdfs(const std::string& name, bool variations) {
   }
 }
 
-struct reweighter_impl: branches {
+struct reweighter_impl: event {
   reweighter::args_struct args;
 
   const std::vector<std::unique_ptr<LHAPDF::PDF>> pdfs;
   LHAPDF::PDF *pdf = nullptr;
 
-  using scale_function = std::function<double(branches& b)>;
+  // using scale_function = std::function<double(event&)>;
+  using scale_function = double(*)(event&);
   static std::map<std::string, scale_function> scale_functions;
   static scale_function& get_scale_fcn(const std::string& name) {
     try {
@@ -102,9 +97,9 @@ struct reweighter_impl: branches {
   std::vector<fac_vars_struct> fac_vars;
   std::vector<double> weights;
 
-  reweighter_impl(TTreeReader& reader, reweighter::args_struct args)
-  : branches(reader),
-    args(std::move(args)),
+  reweighter_impl(TTreeReader& reader, reweighter::args_struct _args)
+  : event(reader),
+    args(std::move(_args)),
     pdfs(make_pdfs(args.pdf,args.pdf_var)),
     scale_f(get_scale_fcn(args.scale)),
     scale_base_value(),
@@ -161,6 +156,7 @@ struct reweighter_impl: branches {
   } fc;
 
   void fac_calc(fac_vars_struct& vars) {
+    TEST(__PRETTY_FUNCTION__)
     fc.muF = scale_base_value * vars.k;
     fc.id  = { *id1, *id2 };
     fc.x   = { * x1, * x2 };
@@ -182,6 +178,7 @@ struct reweighter_impl: branches {
   }
 
   void ren_calc(ren_vars_struct& vars) {
+    TEST(__PRETTY_FUNCTION__)
     const double muR = scale_base_value * vars.k;
 
     vars.ar = std::pow(pdf->alphasQ(muR)/(*alphas), (*alphasPower));
@@ -195,6 +192,7 @@ struct reweighter_impl: branches {
   }
 
   double combine(const reweighter::ren_fac<unsigned>& ki) {
+    TEST(__PRETTY_FUNCTION__)
     double w;
 
     if (ki.fac) {
@@ -219,6 +217,7 @@ struct reweighter_impl: branches {
 
   void operator()() {
     scale_base_value = scale_f(*this);
+    TEST(__PRETTY_FUNCTION__)
 
     pdf = fc.pdf = pdfs[0].get();
     for (auto& vars : ren_vars) ren_calc(vars);
@@ -271,18 +270,43 @@ double reweighter::operator[](unsigned i) const {
 }
 std::string reweighter::weight_name(unsigned i) const {
   const auto *pdf = impl->pdfs[i].get();
-  return ivanp::cat(
-    pdf->set().name(), '_',
-    pdf->memberID(), '_',
-    impl->args.scale
-    // '_',
-    // "ren", impl->args.K[impl->args.Ki[i].ren], '_',
-    // "fac", impl->args.K[impl->args.Ki[i].fac]
-  );
+  std::stringstream ss;
+  if (impl->args.Ki[i].ren)
+    ss << "_ren" << impl->args.Kr[*impl->args.Ki[i].ren];
+  if (impl->args.Ki[i].fac)
+    ss <<  "_fac" << impl->args.Kf[*impl->args.Ki[i].fac];
+
+  return ss.str();
 }
+
+using namespace ivanp::math;
 
 decltype(reweighter_impl::scale_functions)
 reweighter_impl::scale_functions {
-
+  {"HT\'/2", [](event& e){
+    TEST(__PRETTY_FUNCTION__)
+    double HT = 0.;
+    TEST((*e.nparticle))
+    for (int i=0, n=*e.nparticle; i<n; ++i)
+      HT += std::sqrt( e.kf[i]==25
+          ? sq(e.E[i])-sq(e.pz[i]) // ET for Higgs
+          : sq(e.px[i],e.py[i]) ); // pT
+    return 0.5*HT;
+  }},
+  {"HT\'\'", [](event& e){
+    double HT = 0., mH;
+    for (int i=0, n=*e.nparticle; i<n; ++i) {
+      HT += std::sqrt( sq(e.px[i],e.py[i]) ); // pT
+      if (e.kf[i]==25)
+        mH = std::sqrt( sq(e.E[i]) - sq(e.px[i],e.py[i],e.pz[i]) );
+    }
+    return mH + 0.5*HT;
+  }},
+  {"HT", [](event& e){
+    double HT = 0.;
+    for (int i=0, n=*e.nparticle; i<n; ++i)
+      HT += std::sqrt( sq(e.px[i],e.py[i]) ); // pT
+    return HT;
+  }}
 };
 
