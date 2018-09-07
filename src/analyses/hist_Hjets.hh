@@ -258,7 +258,8 @@ hists["Njets_incl"] = h_Njets_incl;
 BOOST_PP_REPEAT(HIST_MAX_D,SAVE_HISTS,)
 
 const string ofname = runcards["output"];
-cout << "\033[36mWriting output\033[0m: " << ofname << endl;
+cout << "\033[36mWriting output\033[0m: " << ofname;
+cout << " \033[32;1m✔\033[0m" << endl;
 
 try { // write output file
   std::ofstream file(ofname);

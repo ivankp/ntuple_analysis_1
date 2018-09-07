@@ -214,7 +214,7 @@ int main(int argc, char* argv[]) {
   // Reserve weights vector
   vector<double> weights(std::accumulate(
     reweighters.begin(), reweighters.end(), _weights.size(),
-    [](unsigned n, auto& rew){ return n + rew.nweights(); }
+    [](unsigned n, const auto& rew){ return n + rew.nweights(); }
   ));
 
   for (auto& rew : reweighters) // get weights names

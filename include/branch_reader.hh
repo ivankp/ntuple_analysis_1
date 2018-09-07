@@ -115,32 +115,32 @@ public:
 };
 
 using float_reader = branch_reader<double,float>;
-using floats_reader = branch_reader<double[],float>;
+using floats_reader = branch_reader<double[],float[]>;
 
 template <typename T>
-class branch_reader<T> {
+class branch_reader<T>: std::conditional_t<
+  std::is_array<T>::value,
+  TTreeReaderArray<std::remove_extent_t<T>>,
+  TTreeReaderValue<T>>
+{
 public:
   using value_type = std::remove_extent_t<T>;
 
   static constexpr bool is_array = std::is_array<T>::value;
 
 private:
-  using base_type = std::conditional_t<
+  using base = std::conditional_t<
     is_array,
     TTreeReaderArray<value_type>,
     TTreeReaderValue<value_type>>;
 
-  base_type x;
-
 public:
-  branch_reader(TTreeReader& reader, const char* branch_name)
-  : x(reader,branch_name) { }
+  using base::base;
+  using base::GetBranchName;
 
-  inline const char* GetBranchName() const { return x.GetBranchName(); }
+  inline value_type operator*() { return base::operator*(); }
 
-  inline value_type operator*() { return *x; }
-
-  inline value_type operator[](size_t i) { return x[i]; }
+  inline value_type operator[](size_t i) { return base::operator[](i); }
 };
 
 #endif

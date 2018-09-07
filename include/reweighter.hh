@@ -10,7 +10,7 @@ class reweighter_impl;
 
 
 class reweighter {
-  reweighter_impl * const impl;
+  reweighter_impl *impl;
 
 public:
   template <typename T>
@@ -25,6 +25,11 @@ public:
   };
 
   reweighter(TTreeReader& reader, args_struct args);
+  reweighter() = delete;
+  reweighter(const reweighter&) = delete;
+  reweighter(reweighter&&);
+  reweighter& operator=(const reweighter&) = delete;
+  reweighter& operator=(reweighter&&) = delete;
   ~reweighter();
 
   void operator()();

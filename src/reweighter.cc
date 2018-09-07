@@ -71,9 +71,9 @@ make_pdfs(const std::string& name, bool variations) {
 }
 
 struct reweighter_impl: event {
-  reweighter::args_struct args;
+  const reweighter::args_struct args;
 
-  const std::vector<std::unique_ptr<LHAPDF::PDF>> pdfs;
+  std::vector<std::unique_ptr<LHAPDF::PDF>> pdfs;
   LHAPDF::PDF *pdf = nullptr;
 
   // using scale_function = std::function<double(event&)>;
@@ -236,15 +236,16 @@ struct reweighter_impl: event {
     for (auto& vars : fac_vars) fac_calc(vars);
 
     // scale variations
-    for (unsigned i=0; i<args.Ki.size(); ++i)
-      weights[i] = combine(args.Ki[i]);
+    unsigned wi = 0;
+    for (; wi<args.Ki.size(); ++wi)
+      weights[wi] = combine(args.Ki[wi]);
 
     // pdf variations
-    for (unsigned i=1; i<pdfs.size(); ++i) {
+    for (unsigned i=1; i<pdfs.size(); ++i, ++wi) {
       pdf = fc.pdf = pdfs[i].get();
       ren_calc(ren_vars[0]);
       fac_calc(fac_vars[0]);
-      weights[args.Ki.size()+i] = combine(args.Ki[0]);
+      weights[wi] = combine(args.Ki[0]);
     }
   }
 };
@@ -252,6 +253,7 @@ constexpr std::array<int,10> reweighter_impl::fac_calc_struct::quarks;
 
 reweighter::reweighter(TTreeReader& reader, args_struct args)
 : impl(new reweighter_impl(reader, std::move(args))) { }
+reweighter::reweighter(reweighter&& o): impl(o.impl) { o.impl = nullptr; }
 reweighter::~reweighter() { delete impl; }
 
 void reweighter::args_struct::add_scale(
