@@ -130,8 +130,8 @@ struct reweighter_impl: event {
 
   struct fac_calc_struct {
     LHAPDF::PDF *pdf;
-    std::array<int,2> id;
     double muF;
+    std::array<int,2> id;
     std::array<double,2> x, xp;
 
     static constexpr std::array<int,10> quarks {
@@ -148,18 +148,21 @@ struct reweighter_impl: event {
       return fxQ(id[r],x[r]);
     }
     double f1(unsigned r) const {
-      if (id[r] != 21) return fxQ(id[r],x[r]);
+      const double _x = x[r];
+      if (id[r] != 21) return fxQ(id[r],_x);
       else {
         double f = 0.;
-        for (int q : quarks) f += fxQ(q,x[r]);
+        for (int q : quarks) f += fxQ(q,_x);
         return f;
       }
     };
     double f2(unsigned r) const {
-      if (id[r] != 21) return fxQ(id[r],x[r]/xp[r],x[r]);
+      const double _x  = x[r];
+      const double _xp = _x/xp[r];
+      if (id[r] != 21) return fxQ(id[r],_xp,_x);
       else {
         double f = 0.;
-        for (int q : quarks) f += fxQ(q,x[r]/xp[r],x[r]);
+        for (int q : quarks) f += fxQ(q,_xp,_x);
         return f;
       }
     };

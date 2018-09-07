@@ -175,11 +175,6 @@ int main(int argc, char* argv[]) {
   }
   TChain& chain = chains.front();
 
-  // delete the blocking file
-  // system("ls -lh /home/ivanp/.condor_cp_mutex");
-  // system("rm -fv /home/ivanp/.condor_cp_mutex");
-  // if (condor_cp_mutex) condor_cp_mutex = boost::none;
-
   if (weights_names.empty()) { // Find default weights
     const char* names[] = { "weight2", "weight" };
     for (unsigned i=0, n=sizeof(names)/sizeof(*names); i<n; ++i)
@@ -250,12 +245,6 @@ int main(int argc, char* argv[]) {
           weights[wi] = rew[i];
       }
     }
-
-    // TEST(*_weights[0])
-    // TEST(*_w2)
-    // TEST((*_weights[0]==*_w2))
-    //
-    // if (ent < 10) continue; else break;
 
 #define ANALYSIS_LOOP
 #include STR(ANALYSIS)
