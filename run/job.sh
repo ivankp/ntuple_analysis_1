@@ -15,7 +15,7 @@ echo "LD_LIBRARY_PATH = $LD_LIBRARY_PATH"
 
 sleep $(bc <<< "0.1*$1")
 
-../../bin/analyses/hist_Hjets ../../cards/test.json $2 --tmp-dir=$TMPDIR
+../../bin/analyses/hist_Hjets ../../cards/Hjets.json $2 --tmp-dir=$TMPDIR
 
 exit_code=$?
 if [ $exit_code -ne 0 ]; then

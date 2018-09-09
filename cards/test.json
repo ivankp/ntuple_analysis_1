@@ -7,7 +7,7 @@
   "tree": "t3",
   "weights": "weight.*"
 }],
-"entry_range": [0,10000],
+"entry_range": [0,0],
 "reweighting": [
   { "pdf": "CT10nlo",
     "pdf_var": false,

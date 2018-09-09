@@ -1,8 +1,8 @@
 #include <iostream>
 #include <fstream>
-#include <functional>
 #include <vector>
 #include <map>
+#include <functional>
 
 #include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/iostreams/filter/lzma.hpp>
@@ -13,6 +13,7 @@
 #include "ivanp/error.hh"
 #include "ivanp/tuple.hh"
 #include "ivanp/container.hh"
+#include "ivanp/functional.hh"
 #include "ivanp/program_options.hh"
 
 #define TEST(var) \
@@ -27,6 +28,7 @@ using std::get;
 using std::tie;
 using nlohmann::json;
 using ivanp::cat;
+using ivanp::y_combinator;
 
 inline json::json_pointer operator "" _jp(const char* s, size_t n) {
   return json::json_pointer(std::string(s,n));
@@ -43,25 +45,12 @@ void add(const std::tuple<json*,json*>& j) {
 }
 template <typename T> T get(const json& j) { return j.get<T>(); }
 
-// https://stackoverflow.com/a/40873657/2640636
-template <class F> struct Ycombinator {
-  F f;
-  template <class... Args>
-  decltype(auto) operator()(Args&&... args) const {
-    return f(std::ref(*this), std::forward<Args>(args)...);
-  }
-};
-template <class F>
-Ycombinator<std::decay_t<F>> make_Ycombinator(F&& f) {
-  return { std::forward<F>(f) };
-}
-
 int main(int argc, char* argv[]) {
   std::vector<const char*> ifnames;
   const char* ofname;
-  bool verbose = false,
-       merge_xsec = false,
+  bool merge_xsec = false,
        merge_variations = false;
+  int verbose = 0;
 
   try {
     using namespace ivanp::po;
@@ -71,7 +60,7 @@ int main(int argc, char* argv[]) {
       (merge_xsec,{"-x","--xsec","--nlo"},
        "merge cross sections (e.g. NLO parts)")
       (merge_variations,{"-u","--unc"},"merge scale & pdf variations")
-      (verbose,'v',"verbose")
+      (verbose,'v',"verbose",switch_init(1))
       .parse(argc,argv,true)) return 0;
   } catch (const std::exception& e) {
     cerr << e << endl;
@@ -81,7 +70,7 @@ int main(int argc, char* argv[]) {
 
   json out;
   for (const char* ifname : ifnames) {
-    if (verbose) cout << ifname << endl;
+    if (verbose>=1) cout << ifname << endl;
     static bool first = true;
     json in;
     try {
@@ -104,12 +93,12 @@ int main(int argc, char* argv[]) {
       const double norm = in.at("/annotation/count/norm"_jp);
       if (norm!=1) {
         for (auto& h : in.at("histograms")) {
-          make_Ycombinator([norm](auto rec, auto& bin, unsigned depth)->void {
+          y_combinator([norm](auto rec, auto& bin, unsigned depth)->void {
             if (bin.is_null()) return;
             if (depth) for (auto& b : bin) rec(b,depth-1);
-            else {
-              bin[0] = get<double>(bin.at(0))/norm;
-              bin[1] = get<double>(bin.at(1))/(norm*norm);
+            else for (auto& b : bin[0]) {
+              b[0] = get<double>(b.at(0))/norm;
+              b[1] = get<double>(b.at(1))/(norm*norm);
             }
           })(h.at("bins"),in.at("/annotation/bins"_jp).size());
         }
@@ -119,11 +108,14 @@ int main(int argc, char* argv[]) {
     if (first) { // first file
       first = false;
       out = std::move(in);
-      // auto& output = out.at("/annotation/runcard/output"_jp);
-      // if (!output.is_array()) output = { std::move(output) };
       auto& runcard = out.at("/annotation/runcard"_jp);
       runcard.erase("entry_range");
       runcard.erase("output");
+      if (verbose>=2) {
+        auto& hists = out.at("histograms");
+        for (auto h=hists.begin(), end=hists.end(); h!=end; ++h)
+          cout << "  " << h.key() << endl;
+      }
     } else {
       try {
         compat("/annotation/bins"_jp,out,in);
@@ -140,9 +132,6 @@ int main(int argc, char* argv[]) {
         for (auto&& f : input_in[i].at("files"))
           input_out[i].at("files").emplace_back(std::move(f));
 
-      // out.at("/annotation/runcard/output"_jp).emplace_back(std::move(
-      //   in.at("/annotation/runcard/output"_jp)));
-
       auto count = tie(out,in) | [](auto& x){
         return &x.at("/annotation/count"_jp);
       };
@@ -157,11 +146,12 @@ int main(int argc, char* argv[]) {
       for (auto it=get<0>(hists)->begin(),
                end=get<0>(hists)->end(); it!=end; ++it)
       {
+        if (verbose>=2) cout << "  " << it.key() << endl;
         auto& h_out = it.value();
         auto& h_in  = get<1>(hists)->at(it.key());
         compat("axes",h_out,h_in);
 
-        make_Ycombinator([](auto rec, const auto& bins) -> void {
+        y_combinator([](auto rec, const auto& bins) -> void {
           switch (get<0>(bins)->type()) {
             case (json::value_t::array):
               for (unsigned i=0, n=get<0>(bins)->size(); i<n; ++i)
@@ -184,18 +174,16 @@ int main(int argc, char* argv[]) {
   if (merge_xsec) out.at("/annotation/count/norm"_jp) = 1;
 
   if (merge_variations) {
-    json *weight=nullptr, *bin=nullptr;
-    for (auto& b : out.at("/annotation/bins"_jp)) {
-      if (b[0]=="weight") weight = &b[1];
-      if (b[0]=="bin") bin = &b[1];
-    }
+    if (verbose>=1) cout << "\033[36mmerging variations\033[0m" << endl;
+    const auto& weights = out.at("/annotation/weights"_jp);
     struct w_struct { string pdf,ren,fac; vector<unsigned> scale_i,pdf_i; };
     std::map<string,w_struct> ws;
+    vector<unsigned> other_weights;
     using namespace boost;
-    const regex re("([^:]+):(\\d+)(?:-ren:([\\d.]+))?(?:-fac:([\\d.]+))?");
+    const regex re("([^:]+):(\\d+)(?: ren:([\\d.]+))?(?: fac:([\\d.]+))?");
     smatch m;
-    for (unsigned i=0, n=weight->size(); i<n; ++i) {
-      if (regex_match((*weight)[i].get<string>(),m,re)) {
+    for (unsigned i=0, n=weights.size(); i<n; ++i) {
+      if (regex_match(weights[i].get<string>(),m,re)) {
         auto& w = ws[m[1]];
         if (!w.scale_i.size()) {
           w.pdf = m[2];
@@ -210,12 +198,50 @@ int main(int argc, char* argv[]) {
             w.pdf_i.push_back(i);
           else throw ivanp::error("unexpected weight \"",m[0],'\"');
         }
-      }
+      } else other_weights.push_back(i);
     }
-    // make_Ycombinator([](auto rec, const auto& bins) -> void {
-    // })(
-    // );
-    return 0;
+    // for (const auto& _w : ws) {
+    //   TEST(_w.first)
+    //   const auto& w = _w.second;
+    //   TEST(w.pdf)
+    //   TEST(w.ren)
+    //   TEST(w.fac)
+    //   for (auto& s : w.scale_i) {
+    //     TEST(s)
+    //     TEST(weights[s])
+    //   }
+    //   for (auto& p : w.pdf_i) {
+    //     TEST(p)
+    //     TEST(weights[p])
+    //   }
+    // }
+    const auto bins_depth = out.at("/annotation/bins"_jp).size();
+    auto& hists = out.at("histograms");
+    for (auto h=hists.begin(), end=hists.end(); h!=end; ++h) {
+      if (verbose>=2) cout << "  " << h.key() << endl;
+      y_combinator([&](auto f, auto& bin, unsigned depth) -> void {
+        if (depth) for (auto& b : bin) f(b,depth-1);
+        else {
+          // TEST(bin)
+          auto& b = bin[0];
+          auto b2 = json::array();
+          for (auto i : other_weights) b2.push_back(b[i]);
+          for (const auto& w : ws) {
+            auto _b = b[w.second.scale_i[0]];
+            std::tie(w.second.scale_i,w.second.pdf_i) | [&](const auto& is) {
+              if (is.empty()) _b.push_back(nullptr);
+              else {
+                _b.push_back(ivanp::minmax(
+                  is | [&](auto i) -> double { return b[i][0]; }
+                ));
+              }
+            };
+            b2.push_back(_b);
+          }
+          b = b2;
+        }
+      })( h->at("bins"), bins_depth );
+    }
   }
 
   try {

@@ -103,9 +103,9 @@ struct reweighter_impl: event {
   ) {
     auto* pdf = pdfs[pdfi].get();
     std::stringstream ss;
-    ss << scale << '-' << pdf->set().name() << ':' << pdf->memberID();
-    if (args.Ki[ki].ren) ss << "-ren:" << args.Kr[*args.Ki[ki].ren];
-    if (args.Ki[ki].fac) ss << "-fac:" << args.Kf[*args.Ki[ki].fac];
+    ss << scale << ' ' << pdf->set().name() << ':' << pdf->memberID();
+    if (args.Ki[ki].ren) ss << " ren:" << args.Kr[*args.Ki[ki].ren];
+    if (args.Ki[ki].fac) ss << " fac:" << args.Kf[*args.Ki[ki].fac];
     return ss.str();
   }
 

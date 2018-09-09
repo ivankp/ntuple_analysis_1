@@ -23,7 +23,7 @@ struct adl_serializer<
 > {
   static void to_json(json& j, const nlo_bin<T>& bin) {
     bin.finalize();
-    j = { bin.w, bin.w2 + bin.w*bin.w, bin.n };
+    j = { bin.w, bin.w2 + bin.wtmp*bin.wtmp, bin.n };
   }
 };
 
@@ -33,7 +33,7 @@ struct adl_serializer<
 > {
   static void to_json(json& j, const nlo_bin<T>& bin) {
     auto j0 = json::array();
-    for (const auto& w : bin.ws) j0.push_back({ w.w, w.w2 + w.w*w.w });
+    for (const auto& w : bin.ws) j0.push_back({ w.w, w.w2 + w.wtmp*w.wtmp });
     j = { j0, bin.n };
   }
 };
