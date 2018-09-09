@@ -1,9 +1,12 @@
 #include <iostream>
 #include <fstream>
 #include <functional>
+#include <vector>
+#include <map>
 
 #include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/iostreams/filter/lzma.hpp>
+#include <boost/regex.hpp>
 
 #include "json/nlohmann.hpp"
 
@@ -56,7 +59,9 @@ Ycombinator<std::decay_t<F>> make_Ycombinator(F&& f) {
 int main(int argc, char* argv[]) {
   std::vector<const char*> ifnames;
   const char* ofname;
-  bool merge_xsec = false, verbose = false;
+  bool verbose = false,
+       merge_xsec = false,
+       merge_variations = false;
 
   try {
     using namespace ivanp::po;
@@ -65,6 +70,7 @@ int main(int argc, char* argv[]) {
       (ofname,'o',"output JSON file",req())
       (merge_xsec,{"-x","--xsec","--nlo"},
        "merge cross sections (e.g. NLO parts)")
+      (merge_variations,{"-u","--unc"},"merge scale & pdf variations")
       (verbose,'v',"verbose")
       .parse(argc,argv,true)) return 0;
   } catch (const std::exception& e) {
@@ -122,6 +128,7 @@ int main(int argc, char* argv[]) {
       try {
         compat("/annotation/bins"_jp,out,in);
         compat("/annotation/runcard/analysis"_jp,out,in);
+        compat("/annotation/runcard/reweighting"_jp,out,in);
       } catch (const std::exception& e) {
         cerr << "In file \"" << ifname << "\": " << e << endl;
         return 1;
@@ -175,6 +182,41 @@ int main(int argc, char* argv[]) {
   }
 
   if (merge_xsec) out.at("/annotation/count/norm"_jp) = 1;
+
+  if (merge_variations) {
+    json *weight=nullptr, *bin=nullptr;
+    for (auto& b : out.at("/annotation/bins"_jp)) {
+      if (b[0]=="weight") weight = &b[1];
+      if (b[0]=="bin") bin = &b[1];
+    }
+    struct w_struct { string pdf,ren,fac; vector<unsigned> scale_i,pdf_i; };
+    std::map<string,w_struct> ws;
+    using namespace boost;
+    const regex re("([^:]+):(\\d+)(?:-ren:([\\d.]+))?(?:-fac:([\\d.]+))?");
+    smatch m;
+    for (unsigned i=0, n=weight->size(); i<n; ++i) {
+      if (regex_match((*weight)[i].get<string>(),m,re)) {
+        auto& w = ws[m[1]];
+        if (!w.scale_i.size()) {
+          w.pdf = m[2];
+          w.ren = m[3];
+          w.fac = m[4];
+          w.scale_i.push_back(i);
+          w.  pdf_i.push_back(i);
+        } else {
+          if (m[2]==w.pdf && (m[3]!=w.ren || m[4]!=w.fac))
+            w.scale_i.push_back(i);
+          else if (m[2]!=w.pdf && m[3]==w.ren && m[4]==w.fac)
+            w.pdf_i.push_back(i);
+          else throw ivanp::error("unexpected weight \"",m[0],'\"');
+        }
+      }
+    }
+    // make_Ycombinator([](auto rec, const auto& bins) -> void {
+    // })(
+    // );
+    return 0;
+  }
 
   try {
     std::ofstream file(ofname);

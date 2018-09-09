@@ -51,7 +51,7 @@ C_Higgs2diphoton := $(ROOT_CXXFLAGS)
 
 C_reweighter := $(ROOT_CXXFLAGS) $(LHAPDF_CXXFLAGS)
 
-L_merge := -lboost_iostreams
+L_merge := -lboost_iostreams -lboost_regex
 
 bin/merge: \
   $(BLD)/ivanp/program_options/program_options.o

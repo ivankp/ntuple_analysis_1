@@ -50,9 +50,8 @@ MAKE_ENUM(photon_cuts,(all)(with_photon_cuts))
 #define CATEGORIES (photon_cuts)(isp)
 #endif
 
-using cat_bin = ivanp::category_bin<nlo_bin,BOOST_PP_SEQ_ENUM(CATEGORIES)>;
-
-using bin_t = multiweight_bin<cat_bin>;
+using nlo_bin_t = nlo_bin<double[]>;
+using bin_t = ivanp::category_bin<nlo_bin_t,BOOST_PP_SEQ_ENUM(CATEGORIES)>;
 template <bool... OF>
 using hist = ivanp::binner<bin_t,
   std::tuple<ivanp::axis_spec<typename re_axes::axis_type,OF,OF>...> >;
@@ -94,7 +93,7 @@ cout << "\033[36mBinning\033[0m: " << bfname << '\n' << endl;
 re_axes ra(bfname);
 
 // Define histograms ==============================================
-bin_t::weights.resize(weights.size());
+nlo_bin_t::weights.resize(weights.size());
 
 ivanp::binner<bin_t, std::tuple<ivanp::axis_spec<
     ivanp::uniform_axis<int>,0,1
@@ -142,14 +141,14 @@ const size_t np = *_nparticle;
 partons.clear();
 
 for (unsigned i=weights.size(); i--; ) // set weights
-  bin_t::weights[i] = weights[i];
+  nlo_bin_t::weights[i] = weights[i];
 
 // Keep track of multi-entry events -------------------------------
 ++num_entries;
-nlo_bin::current_id = *_id;
-const bool new_id = (prev_id != nlo_bin::current_id);
+nlo_bin_t::current_id = *_id;
+const bool new_id = (prev_id != nlo_bin_t::current_id);
 if (new_id) {
-  prev_id = nlo_bin::current_id;
+  prev_id = nlo_bin_t::current_id;
   ncount_total += (_ncount ? **_ncount : 1);
   ++num_events;
 }
@@ -172,7 +171,7 @@ for (size_t i=0; i<np; ++i) {
 }
 if (!n25 && n22!=2) throw std::runtime_error("missing Higgs or photons");
 
-cat_bin::id<isp>() = (unsigned)get_isp(*_id1,*_id2);
+bin_t::id<isp>() = (unsigned)get_isp(*_id1,*_id2);
 // ----------------------------------------------------------------
 
 // Jets -----------------------------------------------------------
@@ -204,7 +203,7 @@ if (A1_pT < A2_pT) {
 // Photon cuts ----------------------------------------------------
 const double A1_eta = photons[0].Eta(), A2_eta = photons[1].Eta();
 
-cat_bin::id<photon_cuts>() = !(
+bin_t::id<photon_cuts>() = !(
   (A1_pT < 0.35*125.) or
   (A2_pT < 0.25*125.) or
   photon_eta_cut(std::abs(A1_eta)) or
@@ -235,10 +234,10 @@ cnt["norm"] = ncount_total;
 #define CATEGORY_ANN(r, data, elem) \
   ann_bins.push_back({STR(elem),enum_traits<elem>::all_str()});
 
+ann["weights"] = weights_names;
 auto& ann_bins = ann["bins"];
-ann_bins.push_back({"weight",weights_names});
 BOOST_PP_SEQ_FOR_EACH(CATEGORY_ANN,,CATEGORIES)
-ann_bins.push_back({"bin",{"w","w2","n"}});
+ann_bins.push_back({"bin",{{"w","w2"},"n"}});
 
 auto& hists = out["histograms"];
 
@@ -258,8 +257,7 @@ hists["Njets_incl"] = h_Njets_incl;
 BOOST_PP_REPEAT(HIST_MAX_D,SAVE_HISTS,)
 
 const string ofname = runcards["output"];
-cout << "\033[36mWriting output\033[0m: " << ofname;
-cout << " \033[32;1m✔\033[0m" << endl;
+cout << "\033[36mWriting output\033[0m: " << ofname << std::flush;
 
 try { // write output file
   std::ofstream file(ofname);
@@ -272,10 +270,12 @@ try { // write output file
     std::ostream(&buf) << out;
   } else file << out;
 } catch (const std::exception& e) {
+  cout << endl;
   cerr << "\033[31mError writing file\033[0m \"" << ofname << "\": "
        << e.what() << endl;
   return 1;
 }
+cout << " \033[32;1m✔\033[0m" << endl;
 
 #endif
 

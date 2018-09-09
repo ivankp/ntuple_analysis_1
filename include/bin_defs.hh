@@ -3,17 +3,7 @@
 
 #include <vector>
 
-template <typename T>
-struct arrow_self {
-  inline T* operator->() noexcept {
-    return static_cast<T*>(this);
-  }
-  inline const T* operator->() const noexcept {
-    return static_cast<const T*>(this);
-  }
-};
-
-struct lo_bin: arrow_self<lo_bin> {
+struct lo_bin {
   double w = 0, w2 = 0;
   long unsigned n = 0;
   inline void operator()() noexcept {
@@ -33,10 +23,19 @@ struct lo_bin: arrow_self<lo_bin> {
   inline double err2() const noexcept { return w2; }
 };
 
-struct nlo_bin: arrow_self<nlo_bin> {
+struct nlo_bin_base {
   int id = 0; // event id
   static int current_id;
-  double w = 0, wtmp = 0, w2 = 0;
+};
+int nlo_bin_base::current_id;
+
+template <typename T, typename SFINAE=void> struct nlo_bin;
+
+template <typename T>
+struct nlo_bin<T,std::enable_if_t<std::is_arithmetic<T>::value>>
+: nlo_bin_base {
+  using type = T;
+  T w=0, wtmp=0, w2=0;
   long unsigned n = 0;
   inline void operator()() noexcept {
     if (id == current_id) ++wtmp;
@@ -48,7 +47,7 @@ struct nlo_bin: arrow_self<nlo_bin> {
     ++w;
     ++n;
   }
-  inline void operator()(double weight) noexcept {
+  inline void operator()(const T& weight) noexcept {
     if (id == current_id) wtmp += weight;
     else {
       id = current_id;
@@ -65,11 +64,69 @@ struct nlo_bin: arrow_self<nlo_bin> {
     n  += b.n;
     return *this;
   }
-  inline double err2() const noexcept { return w2 + wtmp*wtmp; }
+  inline void finalize() noexcept { w2 += wtmp*wtmp; }
 };
-int nlo_bin::current_id;
 
-struct profile_bin: arrow_self<profile_bin> {
+template <typename T>
+struct nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>
+: nlo_bin_base {
+  using type = T;
+  static std::vector<T> weights;
+  static unsigned wi;
+  struct w_struct { T w=0, wtmp=0, w2=0; };
+  std::vector<w_struct> ws;
+  long unsigned n = 0;
+  nlo_bin(): nlo_bin_base(), ws(weights.size()) { }
+  inline void operator()() noexcept {
+    if (id == current_id) {
+      for (unsigned i=ws.size(); i; ) {
+        --i;
+        auto  w = weights[i];
+        auto& _ = ws[i];
+        _.w    += w;
+        _.wtmp += w;
+      }
+    } else {
+      id = current_id;
+      for (unsigned i=ws.size(); i; ) {
+        --i;
+        auto  w = weights[i];
+        auto& _ = ws[i];
+        _.w   += w;
+        _.w2  += _.wtmp*_.wtmp;
+        _.wtmp = w;
+      }
+    }
+    ++n;
+  }
+  inline nlo_bin& operator+=(const nlo_bin& b) noexcept {
+    for (unsigned i=ws.size(); i; ) {
+      --i;
+      auto& _b = b.ws[i];
+      auto& _  =   ws[i];
+      _.w    += _b.w;
+      _.wtmp += _b.wtmp;
+      _.w2   += _b.w2;
+    }
+    n += b.n;
+    return *this;
+  }
+  inline void finalize() noexcept {
+    for (unsigned i=ws.size(); i; ) {
+      --i;
+      auto& _ = ws[i];
+      _.w2 += _.wtmp*_.wtmp;
+    }
+  }
+};
+template <typename T>
+std::vector<T>
+nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>::weights;
+template <typename T>
+unsigned
+nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>::wi;
+
+struct profile_bin {
   double w = 0, // total weight
          m = 0, // mean
          s = 0; // variance * (n-1)

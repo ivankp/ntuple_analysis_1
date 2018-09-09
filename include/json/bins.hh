@@ -17,24 +17,24 @@ struct adl_serializer<
   }
 };
 
-// template <typename T>
-// struct adl_serializer<multiweight_bin<T>> {
-//   static void to_json(json& j, const multiweight_bin<T>& bin) {
-//     for (const auto& b : bin.bins) j.emplace_back(b);
-//   }
-// };
-//
-// template <typename Bin, typename E, typename... Es>
-// struct adl_serializer<ivanp::category_bin<Bin,E,Es...>> {
-//   static void to_json(json& j, const ivanp::category_bin<Bin,E,Es...>& bin) {
-//     for (const auto& b : bin.bins) j.emplace_back(b);
-//   }
-// };
+template <typename T>
+struct adl_serializer<
+  nlo_bin<T>, std::enable_if_t<!std::is_array<T>::value>
+> {
+  static void to_json(json& j, const nlo_bin<T>& bin) {
+    bin.finalize();
+    j = { bin.w, bin.w2 + bin.w*bin.w, bin.n };
+  }
+};
 
-template <>
-struct adl_serializer<nlo_bin> {
-  static void to_json(json& j, const nlo_bin& bin) {
-    j = { bin.w, bin.w2, bin.n };
+template <typename T>
+struct adl_serializer<
+  nlo_bin<T>, std::enable_if_t<std::is_array<T>::value>
+> {
+  static void to_json(json& j, const nlo_bin<T>& bin) {
+    auto j0 = json::array();
+    for (const auto& w : bin.ws) j0.push_back({ w.w, w.w2 + w.w*w.w });
+    j = { j0, bin.n };
   }
 };
 
