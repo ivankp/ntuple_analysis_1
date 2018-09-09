@@ -200,36 +200,25 @@ int main(int argc, char* argv[]) {
         }
       } else other_weights.push_back(i);
     }
-    // for (const auto& _w : ws) {
-    //   TEST(_w.first)
-    //   const auto& w = _w.second;
-    //   TEST(w.pdf)
-    //   TEST(w.ren)
-    //   TEST(w.fac)
-    //   for (auto& s : w.scale_i) {
-    //     TEST(s)
-    //     TEST(weights[s])
-    //   }
-    //   for (auto& p : w.pdf_i) {
-    //     TEST(p)
-    //     TEST(weights[p])
-    //   }
-    // }
-    const auto bins_depth = out.at("/annotation/bins"_jp).size();
+    auto& ann_bins = out.at("/annotation/bins"_jp);
+    auto& bin_vars = std::find_if(ann_bins.begin(),ann_bins.end(),
+      [](const auto& x){ return x[0]=="bin"; })->at(1).at(0);
+    bin_vars.push_back({"scale",{"min","max"}});
+    bin_vars.push_back({"pdf"  ,{"min","max"}});
+    const auto bins_depth = ann_bins.size();
     auto& hists = out.at("histograms");
     for (auto h=hists.begin(), end=hists.end(); h!=end; ++h) {
       if (verbose>=2) cout << "  " << h.key() << endl;
       y_combinator([&](auto f, auto& bin, unsigned depth) -> void {
         if (depth) for (auto& b : bin) f(b,depth-1);
         else {
-          // TEST(bin)
           auto& b = bin[0];
           auto b2 = json::array();
           for (auto i : other_weights) b2.push_back(b[i]);
           for (const auto& w : ws) {
             auto _b = b[w.second.scale_i[0]];
             std::tie(w.second.scale_i,w.second.pdf_i) | [&](const auto& is) {
-              if (is.empty()) _b.push_back(nullptr);
+              if (is.size()<2) _b.push_back(nullptr);
               else {
                 _b.push_back(ivanp::minmax(
                   is | [&](auto i) -> double { return b[i][0]; }
