@@ -86,7 +86,7 @@ for ( auto bo : *reader.GetTree()->GetListOfBranches() ) {
 branch_reader<Int_t> _id1(reader,"id1"), _id2(reader,"id2");
 
 const auto& conf = runcards.at("analysis");
-const unsigned njets_required = conf.value("/jets/njets"_jp,0);
+const unsigned min_njets = conf.value("/jets/min_njets"_jp,0);
 
 const std::string bfname = conf.at("binning");
 cout << "\033[36mBinning\033[0m: " << bfname << '\n' << endl;
@@ -97,7 +97,7 @@ nlo_bin_t::weights.resize(weights.size());
 
 ivanp::binner<bin_t, std::tuple<ivanp::axis_spec<
     ivanp::uniform_axis<int>,0,1
-  >>> h_Njets({njets_required+2u,0,(int)njets_required+2});
+  >>> h_Njets({min_njets+2u,0,(int)min_njets+2});
 
 #define H_MACRO(_1,_2,_3,NAME,...) NAME
 #define h_(...) H_MACRO(__VA_ARGS__, h3_, h2_, h1_)(__VA_ARGS__)
@@ -131,7 +131,7 @@ TLorentzVector higgs;
 
 fj::ClusterSequence::print_banner(); // get it out of the way
 cout << jet_def.description() << endl;
-cout << "\033[36mNjets\033[0m >= " << njets_required << endl;
+cout << "\033[36mNjets\033[0m >= " << min_njets << endl;
 
 #endif
 #ifdef ANALYSIS_LOOP // =============================================

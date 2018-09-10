@@ -49,7 +49,8 @@ int main(int argc, char* argv[]) {
   std::vector<const char*> ifnames;
   const char* ofname;
   bool merge_xsec = false,
-       merge_variations = false;
+       merge_variations = false,
+       remove_blank = false;
   int verbose = 0;
 
   try {
@@ -60,7 +61,8 @@ int main(int argc, char* argv[]) {
       (merge_xsec,{"-x","--xsec","--nlo"},
        "merge cross sections (e.g. NLO parts)")
       (merge_variations,{"-u","--unc"},"merge scale & pdf variations")
-      (verbose,'v',"verbose",switch_init(1))
+      (remove_blank,{"-b","--rm-blank"},"remove blank histograms")
+      (verbose,'v',"verbose [0,1,2]",switch_init(1))
       .parse(argc,argv,true)) return 0;
   } catch (const std::exception& e) {
     cerr << e << endl;
@@ -92,6 +94,7 @@ int main(int argc, char* argv[]) {
     if (merge_xsec) { // scale input to scross section
       const double norm = in.at("/annotation/count/norm"_jp);
       if (norm!=1) {
+        const auto bins_depth = in.at("/annotation/bins"_jp).size();
         for (auto& h : in.at("histograms")) {
           y_combinator([norm](auto rec, auto& bin, unsigned depth)->void {
             if (bin.is_null()) return;
@@ -100,7 +103,7 @@ int main(int argc, char* argv[]) {
               b[0] = get<double>(b.at(0))/norm;
               b[1] = get<double>(b.at(1))/(norm*norm);
             }
-          })(h.at("bins"),in.at("/annotation/bins"_jp).size());
+          })(h.at("bins"),bins_depth-1+h.at("axes").size());
         }
       }
     }
@@ -173,9 +176,29 @@ int main(int argc, char* argv[]) {
 
   if (merge_xsec) out.at("/annotation/count/norm"_jp) = 1;
 
+  if (remove_blank) {
+    auto& hists = out.at("histograms");
+    const auto bins_depth = out.at("/annotation/bins"_jp).size();
+    for (auto h=hists.begin(); h!=hists.end(); ) {
+      if (
+        !y_combinator([](auto f, const auto& bin, unsigned depth) -> bool {
+          if (depth) {
+            for (const auto& b : bin) if (f(b,depth-1)) return true;
+          } else {
+            if (get<long>(bin[1])!=0) return true;
+          }
+          return false;
+        })( h->at("bins"), bins_depth-1+(h->at("axes").size()) )
+      ){
+        if (verbose>=1) cout << "\033[31m✘\033[0m " << h.key() << endl;
+        h = hists.erase(h);
+      } else ++h;
+    }
+  }
+
   if (merge_variations) {
     if (verbose>=1) cout << "\033[36mmerging variations\033[0m" << endl;
-    const auto& weights = out.at("/annotation/weights"_jp);
+    auto& weights = out.at("/annotation/weights"_jp);
     struct w_struct { string pdf,ren,fac; vector<unsigned> scale_i,pdf_i; };
     std::map<string,w_struct> ws;
     vector<unsigned> other_weights;
@@ -200,6 +223,11 @@ int main(int argc, char* argv[]) {
         }
       } else other_weights.push_back(i);
     }
+    auto weights2 = json::array();
+    for (auto i : other_weights) weights2.push_back(weights[i]);
+    for (const auto& w : ws) weights2.push_back(w.first);
+    weights = weights2;
+
     auto& ann_bins = out.at("/annotation/bins"_jp);
     auto& bin_vars = std::find_if(ann_bins.begin(),ann_bins.end(),
       [](const auto& x){ return x[0]=="bin"; })->at(1).at(0);
@@ -229,10 +257,11 @@ int main(int argc, char* argv[]) {
           }
           b = b2;
         }
-      })( h->at("bins"), bins_depth );
+      })( h->at("bins"), bins_depth-1+(h->at("axes").size()) );
     }
   }
 
+  if (verbose>=1) cout << "Writing: " << ofname << endl;
   try {
     std::ofstream file(ofname);
     file.exceptions(std::ofstream::failbit | std::ofstream::badbit);

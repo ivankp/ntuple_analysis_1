@@ -13,7 +13,7 @@ h_(HT) h_(H_pT) h_(H_y) h_(H_eta) h_(H_phi) h_(H_mass)
 #endif
 #ifdef HIST_HJ_LOOP // =================================================
 
-if (njets < njets_required) continue;
+if (njets < min_njets) continue;
 
 const double H_pT = higgs.Pt();
 h_H_pT(H_pT);
