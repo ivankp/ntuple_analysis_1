@@ -9,27 +9,31 @@ path = '/home/ivanp/work/ntuple_analysis'
 db  = sqlite3.connect(path+'/sql/ntuples.db')
 cur = db.cursor()
 
-odir = path+'/run/Hjets/'
+# odir = path+'/run/Hjets/'
+odir = '/msu/data/t3work9/ivanp/hists/raw/'
+if odir[-1]!='/': odir += '/'
 print odir
 mkdir(odir)
 
 # sets = set()
 
 for x in cur.execute('''
-SELECT dir,file,id,particle,njets,part
+SELECT dir,file,id,particle,njets,part,info
 FROM ntuples
-WHERE dir="/msu/data/t3work4/luisonig/H1jets_ggf/NTuplesFiles"
-  and njets=1 and energy=13 and part="B"
+WHERE energy=13 and not instr(info,"GGFHTLS")
 '''):
     name = '{3}{4}j_{5}'.format(*x)
     # sets.add(name)
     name = '{}_{}'.format(x[2],name)
+    if x[-1].startswith('ED '): name += '_ED'
+    if x[-1].startswith('mtop '): name += '_mtop'
     print name
     name = odir+name
     with open(name+'_card.json','w') as card:
         json.dump({
             "input": [{ "files": [ x[0]+'/'+x[1] ] }],
-            "output": name+'_hist.json.xz'
+            "output": name+'_hist.json.xz',
+            "analysis": { "jets": { "min_njets": x[4] } }
         },card,separators=(',',':'))
 
 # for s in sets:

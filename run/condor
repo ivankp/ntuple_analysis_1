@@ -13,5 +13,7 @@ getenv = True
 
 # +IsLongJob = true
 
+Concurrency_Limits=DISK_T3WORK4:50
+
 queue card matching *_card.json
 

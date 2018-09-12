@@ -53,6 +53,9 @@ C_reweighter := $(ROOT_CXXFLAGS) $(LHAPDF_CXXFLAGS)
 
 L_merge := -lboost_iostreams -lboost_regex
 
+C_check_tree := $(ROOT_CXXFLAGS)
+L_check_tree := $(ROOT_LDLIBS) -lTreePlayer
+
 bin/merge: \
   $(BLD)/ivanp/program_options/program_options.o
 # -------------------------------------------------------------------

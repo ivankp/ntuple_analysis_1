@@ -1,20 +1,10 @@
 {
 "input": [{
-  "info": "ntuples",
   "files": [
-    "/msu/data/t3work4/luisonig/H1jets_ggf/NTuplesFiles/H1.0j_GGFHT_B_6500_pt25.0_eta4.5_r100_100.root"
-  ],
-  "tree": "t3",
-  "weights": "weight.*"
+    "/msu/data/t3work4/gosam_diphoton_jet/born/born5_1.root"
+  ]
 }],
 "entry_range": [0,0],
-"reweighting": [
-  { "pdf": "CT10nlo",
-    "pdf_var": false,
-    "scale": "HT1",
-    "ren_fac": [ [1,1],[0.5,0.5],[1,0.5],[0.5,1],[2,1],[1,2],[2,2] ]
-  }
-],
 "analysis": {
   "jets": {
     "cuts": { "pT": 30, "eta": 4.4 },

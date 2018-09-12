@@ -23,7 +23,7 @@
 #include "ivanp/timed_counter.hh"
 #include "ivanp/program_options.hh"
 #include "glob.hh"
-#include "copy_file.hh"
+// #include "copy_file.hh"
 
 #define TEST(var) \
   std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;
@@ -108,15 +108,15 @@ int main(int argc, char* argv[]) {
             file_name.end());
 
           cout << "\033[36mCopying\033[0m: "
-               << file_name << " -> " << tmp_file_name;
+               << file_name << " -> " << tmp_file_name << endl;
           using namespace std::chrono;
           using clock = high_resolution_clock;
           clock::time_point t1 = clock::now();
-          copy_file(file_name.c_str(), tmp_file_name.c_str());
-          // system(cat("cp -v ",file_name,' ',tmp_file_name).c_str());
+          // copy_file(file_name.c_str(), tmp_file_name.c_str());
+          system(cat("cp -v ",file_name,' ',tmp_file_name).c_str());
           clock::time_point t2 = clock::now();
           cout << cat(std::setprecision(2),std::fixed,
-              " (", duration_cast<duration<float>>(t2-t1).count(), " sec)"
+              "took ", duration_cast<duration<float>>(t2-t1).count(), " sec"
             ) << endl;
 
           tmp_files.emplace_back(tmp_file_name);
@@ -132,7 +132,9 @@ int main(int argc, char* argv[]) {
               if (key_class->InheritsFrom(TTree::Class()))
                 trees.emplace_back(key.GetName());
             }
-            if (trees.size()>1) {
+            if (trees.size()>1 &&
+                !std::equal(trees.begin()+1, trees.end(), trees.begin()))
+            {
               cerr << "\033[31mMultiple TTrees in file " << file_name
                    << ": " << ivanp::lcat(trees) << "\033[0m" << endl;
               return 1;
