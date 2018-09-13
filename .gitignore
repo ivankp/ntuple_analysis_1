@@ -1,6 +1,7 @@
 /*
 
 !.gitignore
+!.gitmodules
 !Makefile
 !README*
 !include/
