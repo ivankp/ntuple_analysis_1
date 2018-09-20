@@ -2,25 +2,29 @@
 #define BIN_DEFS_HH
 
 #include <vector>
+#include "ivanp/debug/at.hh"
+
+#define TEST(var) \
+  std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;
 
 struct lo_bin {
   double w = 0, w2 = 0;
   long unsigned n = 0;
-  inline void operator()() noexcept {
+  void operator()() noexcept {
     ++w; ++w2; ++n;
   }
-  inline void operator()(double weight) noexcept {
+  void operator()(double weight) noexcept {
     w  += weight;
     w2 += weight*weight;
     ++n;
   }
-  inline lo_bin& operator+=(const lo_bin& b) noexcept {
+  lo_bin& operator+=(const lo_bin& b) noexcept {
     w  += b.w;
     w2 += b.w2;
     n  += b.n;
     return *this;
   }
-  inline double err2() const noexcept { return w2; }
+  double err2() const noexcept { return w2; }
 };
 
 struct nlo_bin_base {
@@ -37,7 +41,7 @@ struct nlo_bin<T,std::enable_if_t<std::is_arithmetic<T>::value>>
   using type = T;
   T w=0, wtmp=0, w2=0;
   long unsigned n = 0;
-  inline void operator()() noexcept {
+  void operator()() noexcept {
     if (id == current_id) ++wtmp;
     else {
       id = current_id;
@@ -47,7 +51,7 @@ struct nlo_bin<T,std::enable_if_t<std::is_arithmetic<T>::value>>
     ++w;
     ++n;
   }
-  inline void operator()(const T& weight) noexcept {
+  void operator()(const T& weight) noexcept {
     if (id == current_id) wtmp += weight;
     else {
       id = current_id;
@@ -57,14 +61,14 @@ struct nlo_bin<T,std::enable_if_t<std::is_arithmetic<T>::value>>
     w += weight;
     ++n;
   }
-  inline nlo_bin& operator+=(const nlo_bin& b) noexcept {
+  nlo_bin& operator+=(const nlo_bin& b) noexcept {
     wtmp += b.wtmp;
     w  += b.w;
     w2 += b.w2;
     n  += b.n;
     return *this;
   }
-  inline void finalize() noexcept { w2 += wtmp*wtmp; }
+  void finalize() noexcept { w2 += wtmp*wtmp; }
 };
 
 template <typename T>
@@ -76,22 +80,40 @@ struct nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>
   struct w_struct { T w=0, wtmp=0, w2=0; };
   std::vector<w_struct> ws;
   long unsigned n = 0;
-  nlo_bin(): nlo_bin_base(), ws(weights.size()) { }
-  inline void operator()() noexcept {
+  static unsigned labels;
+  unsigned label;
+  nlo_bin(): nlo_bin_base(), ws(weights.size()) {
+    // if (weights.size()!=180) TEST(weights.size())
+    // if (ws.size()!=180) TEST(ws.size())
+    label = labels;
+    ++labels;
+  }
+  void operator()() noexcept {
+    if (ws.size()!=weights.size()) {
+      TEST(weights.size())
+      TEST(ws.size())
+      TEST(id)
+      TEST(labels)
+      TEST(label)
+    }
     if (id == current_id) {
       for (unsigned i=ws.size(); i; ) {
         --i;
-        auto  w = weights[i];
-        auto& _ = ws[i];
+        auto  w = weights AT(i);
+        auto& _ = ws AT(i);
         _.w    += w;
         _.wtmp += w;
       }
     } else {
       id = current_id;
+      // TEST(ws.size())
+      // if (weights.size()!=180) TEST(weights.size())
+      // if (ws.size()!=180) TEST(ws.size())
       for (unsigned i=ws.size(); i; ) {
         --i;
-        auto  w = weights[i];
-        auto& _ = ws[i];
+        // auto  w = weights AT(i);
+        auto  w = weights AT(i);
+        auto& _ = ws AT(i);
         _.w   += w;
         _.w2  += _.wtmp*_.wtmp;
         _.wtmp = w;
@@ -99,11 +121,11 @@ struct nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>
     }
     ++n;
   }
-  inline nlo_bin& operator+=(const nlo_bin& b) noexcept {
+  nlo_bin& operator+=(const nlo_bin& b) noexcept {
     for (unsigned i=ws.size(); i; ) {
       --i;
-      auto& _b = b.ws[i];
-      auto& _  =   ws[i];
+      auto& _b = b.ws AT(i);
+      auto& _  =   ws AT(i);
       _.w    += _b.w;
       _.wtmp += _b.wtmp;
       _.w2   += _b.w2;
@@ -111,27 +133,28 @@ struct nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>
     n += b.n;
     return *this;
   }
-  inline void finalize() noexcept {
+  void finalize() noexcept {
     for (unsigned i=ws.size(); i; ) {
       --i;
-      auto& _ = ws[i];
+      auto& _ = ws AT(i);
       _.w2 += _.wtmp*_.wtmp;
     }
   }
 };
-template <typename T>
-std::vector<T>
-nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>::weights;
-template <typename T>
-unsigned
-nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>::wi;
+#define NLO_BIN_STATIC(TYPE,NAME) \
+  template <typename T> \
+  TYPE nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>::NAME
+
+NLO_BIN_STATIC(std::vector<T>,weights);
+NLO_BIN_STATIC(unsigned,wi);
+NLO_BIN_STATIC(unsigned,labels) = 0;
 
 struct profile_bin {
   double w = 0, // total weight
          m = 0, // mean
          s = 0; // variance * (n-1)
   long unsigned n = 0;
-  inline void operator()(double x) noexcept {
+  void operator()(double x) noexcept {
     ++w;
     if (n == 0) {
       m = x;
@@ -142,7 +165,7 @@ struct profile_bin {
     }
     ++n;
   }
-  inline void operator()(double weight, double x) noexcept {
+  void operator()(double weight, double x) noexcept {
     w += weight;
     if (n == 0) {
       m = x;
@@ -153,7 +176,7 @@ struct profile_bin {
     }
     ++n;
   }
-  inline double var() const noexcept { return (n > 1) ? n*s/((n-1)*w) : 0.; }
+  double var() const noexcept { return (n > 1) ? n*s/((n-1)*w) : 0.; }
 };
 
 struct multiweight_bin_base {
@@ -169,20 +192,20 @@ struct multiweight_bin: multiweight_bin_base {
   multiweight_bin(): bins(weights.size()) { }
 
   template <typename... T>
-  inline multiweight_bin& operator()(T... x) noexcept {
+  multiweight_bin& operator()(T... x) noexcept {
     for (unsigned i=weights.size(); i; ) {
-      --i; bins[i](weights[i],x...);
+      --i; bins AT(i)(weights AT(i),x...);
     }
     return *this;
   }
-  inline multiweight_bin& operator+=(const multiweight_bin& rhs) noexcept {
+  multiweight_bin& operator+=(const multiweight_bin& rhs) noexcept {
     for (unsigned i=weights.size(); i; ) {
-      --i; bins[i] += rhs.bins[i];
+      --i; bins AT(i) += rhs.bins AT(i);
     }
     return *this;
   }
-  inline Bin& operator->() noexcept { return bins[wi]; }
-  inline const Bin& operator->() const noexcept { return bins[wi]; }
+  Bin& operator->() noexcept { return bins AT(wi); }
+  const Bin& operator->() const noexcept { return bins AT(wi); }
 };
 
 #endif

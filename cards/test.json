@@ -1,7 +1,7 @@
 {
 "input": [{
   "files": [
-    "/msu/data/t3work4/gosam_diphoton_jet/born/born5_1.root"
+    "/msu/data/t3work4/luisonig/H2jets_ggf/NTuplesFiles/H2.0j_GGFHT_B_6500_pt25.0_eta4.5_r100_100.root"
   ]
 }],
 "entry_range": [0,0],
@@ -9,7 +9,7 @@
   "jets": {
     "cuts": { "pT": 30, "eta": 4.4 },
     "alg": [ "antikt", 0.4 ],
-    "min_njets": 1
+    "min_njets": 2
   },
   "binning": "/home/ivanp/work/ntuple_analysis/cards/Hjets.bins"
 },

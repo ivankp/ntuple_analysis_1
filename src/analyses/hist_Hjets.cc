@@ -43,6 +43,7 @@ auto h_Hjs_mass = h_reserve(min_njets+1,
 #ifdef HIST_HJ_LOOP // =================================================
 
 if (njets < min_njets) continue;
+const unsigned max_njets = std::min(njets,min_njets+1);
 
 const double H_pT   = higgs.Pt();
 const double H_y    = higgs.Rapidity();
@@ -58,7 +59,7 @@ double HT = H_pT;
 double jets_tau_max = 0, jets_tau_sum = 0;
 auto Hjs = higgs;
 
-for (unsigned j=0, nj=jets.size(); j<nj; ++j) {
+for (unsigned j=0; j<max_njets; ++j) {
   const auto jet_pT = jets[j].pt();
   HT += jet_pT;
   h_jet_pT  [j](jet_pT);

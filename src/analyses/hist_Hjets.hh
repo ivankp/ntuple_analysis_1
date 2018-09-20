@@ -92,7 +92,7 @@ const std::string bfname = conf.at("binning");
 cout << "\033[36mBinning\033[0m: " << bfname << '\n' << endl;
 re_axes ra(bfname);
 
-// Define histograms ==============================================
+// Define histograms ================================================
 nlo_bin_t::weights.resize(weights.size());
 
 ivanp::binner<bin_t, std::tuple<ivanp::axis_spec<
@@ -136,14 +136,14 @@ cout << "\033[36mNjets\033[0m >= " << min_njets << endl;
 #endif
 #ifdef ANALYSIS_LOOP // =============================================
 
-// Reset ----------------------------------------------------------
+// Reset ------------------------------------------------------------
 const size_t np = *_nparticle;
 partons.clear();
 
 for (unsigned i=weights.size(); i--; ) // set weights
   nlo_bin_t::weights[i] = weights[i];
 
-// Keep track of multi-entry events -------------------------------
+// Keep track of multi-entry events ---------------------------------
 ++num_entries;
 nlo_bin_t::current_id = *_id;
 const bool new_id = (prev_id != nlo_bin_t::current_id);
@@ -153,7 +153,7 @@ if (new_id) {
   ++num_events;
 }
 
-// Read particles -------------------------------------------------
+// Read particles ---------------------------------------------------
 unsigned n22 = 0; // number of photons
 unsigned n25 = 0; // number of Higgs
 for (size_t i=0; i<np; ++i) {
@@ -171,10 +171,10 @@ for (size_t i=0; i<np; ++i) {
 }
 if (!n25 && n22!=2) throw std::runtime_error("missing Higgs or photons");
 
-bin_t::id<isp>() = (unsigned)get_isp(*_id1,*_id2);
-// ----------------------------------------------------------------
+bin_t::id<isp>((unsigned)get_isp(*_id1,*_id2));
+// ------------------------------------------------------------------
 
-// Jets -----------------------------------------------------------
+// Jets -------------------------------------------------------------
 auto fj_seq = fj::ClusterSequence(partons,jet_def);
 jets = fj_seq.inclusive_jets(jet_pt_cut); // apply pT cut
 // apply eta cut
@@ -190,7 +190,7 @@ std::sort( jets.begin(), jets.end(),
 // resulting number of jets
 const unsigned njets = jets.size();
 
-// Higgs decay or add photons -------------------------------------
+// Higgs decay or add photons ---------------------------------------
 if (n25) photons = Hdecay(higgs,new_id);
 else higgs = photons[0] + photons[1];
 
@@ -200,17 +200,17 @@ if (A1_pT < A2_pT) {
   std::swap(A1_pT,A2_pT);
 }
 
-// Photon cuts ----------------------------------------------------
+// Photon cuts ------------------------------------------------------
 const double A1_eta = photons[0].Eta(), A2_eta = photons[1].Eta();
 
-bin_t::id<photon_cuts>() = !(
+bin_t::id<photon_cuts>(!(
   (A1_pT < 0.35*125.) or
   (A2_pT < 0.25*125.) or
   photon_eta_cut(std::abs(A1_eta)) or
   photon_eta_cut(std::abs(A2_eta))
-);
+));
 
-// Fill Histograms ------------------------------------------------
+// Fill Histograms --------------------------------------------------
 h_Njets.fill_bin(njets);
 
 #define HIST_HJ_LOOP
@@ -219,6 +219,10 @@ h_Njets.fill_bin(njets);
 
 #endif
 #ifdef ANALYSIS_END // ==============================================
+
+#define HIST_HJ_END
+#include STR(HIST_HJ)
+#undef HIST_HJ_END
 
 nlohmann::json out;
 auto& ann = out["annotation"];

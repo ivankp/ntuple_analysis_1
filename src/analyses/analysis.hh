@@ -71,9 +71,9 @@ int main(int argc, char* argv[]) {
   nlohmann::json runcards;
   for (const auto& filename : card_names) {
     nlohmann::json runcard;
-    std::ifstream file(filename);
-    file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
     try {
+      std::ifstream file(filename);
+      file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
       file >> runcard;
     } catch (const std::exception& e) {
       cerr << "\033[31mError reading file\033[0m \"" << filename << "\": "
