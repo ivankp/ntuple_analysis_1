@@ -80,22 +80,8 @@ struct nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>
   struct w_struct { T w=0, wtmp=0, w2=0; };
   std::vector<w_struct> ws;
   long unsigned n = 0;
-  static unsigned labels;
-  unsigned label;
-  nlo_bin(): nlo_bin_base(), ws(weights.size()) {
-    // if (weights.size()!=180) TEST(weights.size())
-    // if (ws.size()!=180) TEST(ws.size())
-    label = labels;
-    ++labels;
-  }
+  nlo_bin(): nlo_bin_base(), ws(weights.size()) { }
   void operator()() noexcept {
-    if (ws.size()!=weights.size()) {
-      TEST(weights.size())
-      TEST(ws.size())
-      TEST(id)
-      TEST(labels)
-      TEST(label)
-    }
     if (id == current_id) {
       for (unsigned i=ws.size(); i; ) {
         --i;
@@ -106,12 +92,8 @@ struct nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>
       }
     } else {
       id = current_id;
-      // TEST(ws.size())
-      // if (weights.size()!=180) TEST(weights.size())
-      // if (ws.size()!=180) TEST(ws.size())
       for (unsigned i=ws.size(); i; ) {
         --i;
-        // auto  w = weights AT(i);
         auto  w = weights AT(i);
         auto& _ = ws AT(i);
         _.w   += w;
@@ -147,7 +129,6 @@ struct nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>
 
 NLO_BIN_STATIC(std::vector<T>,weights);
 NLO_BIN_STATIC(unsigned,wi);
-NLO_BIN_STATIC(unsigned,labels) = 0;
 
 struct profile_bin {
   double w = 0, // total weight

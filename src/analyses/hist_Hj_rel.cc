@@ -73,9 +73,6 @@ const unsigned max_njets = std::min(njets,min_njets+1);
 
 bin_t::id<VBF_cuts>(0);
 bin_t::id<Nj>(njets > min_njets);
-// bin_t::id<Nj>(njets>1 ? njets-1 : 0);
-TEST(njets)
-TEST(bin_t::id<Nj>())
 
 const double A1_phi = photons[0].Phi();
 const double A2_phi = photons[1].Phi();
