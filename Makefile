@@ -1,8 +1,8 @@
 SHELL := bash
 CXX := g++
 CPPFLAGS := -std=c++14 -Iinclude
-CXXFLAGS := -Wall -O3 -flto -fmax-errors=3 $(CPPFLAGS)
-# CXXFLAGS := -Wall -g -fmax-errors=3 $(CPPFLAGS) -DDEBUG_AT
+# CXXFLAGS := -Wall -O3 -flto -fmax-errors=3 $(CPPFLAGS)
+CXXFLAGS := -Wall -g -fmax-errors=3 $(CPPFLAGS) -DDEBUG_AT
 LDFLAGS :=
 LDLIBS :=
 
@@ -58,6 +58,9 @@ L_check_tree := $(ROOT_LDLIBS) -lTreePlayer
 
 bin/merge: \
   $(BLD)/ivanp/program_options/program_options.o
+
+bin/read_hist: \
+  $(BLD)/ivanp/scribe.o
 # -------------------------------------------------------------------
 
 $(DEPS): $(BLD)/%.d: src/%$(EXT)
@@ -80,7 +83,7 @@ bin/analyses/%: $(BLD)/analyses/%.o \
   $(BLD)/ivanp/program_options/program_options.o \
   $(BLD)/ivanp/binner/re_axes.o \
   $(BLD)/glob.o \
-  $(BLD)/copy_file.o \
+  $(BLD)/ivanp/scribe.o \
   $(BLD)/Higgs2diphoton.o \
   $(BLD)/reweighter.o
 	@mkdir -pv $(dir $@)

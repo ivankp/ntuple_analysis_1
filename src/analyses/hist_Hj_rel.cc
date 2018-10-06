@@ -179,7 +179,5 @@ h_H_jjfb_mass ((higgs+jj).M());
 #endif
 #ifdef HIST_HJ_END // ===============================================
 
-return 0;
-
 #endif
 

@@ -12,7 +12,7 @@
 #include "branch_reader.hh"
 #include "reweighter.hh"
 
-#include "json/nlohmann.hpp"
+#include <nlohmann/json.hpp>
 #include "json/print_value_t.hh"
 #include "json/std_regex.hh"
 #include "json/reweighter.hh"

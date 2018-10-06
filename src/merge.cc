@@ -8,7 +8,7 @@
 #include <boost/iostreams/filter/lzma.hpp>
 #include <boost/regex.hpp>
 
-#include "json/nlohmann.hpp"
+#include <nlohmann/json.hpp>
 
 #include "ivanp/error.hh"
 #include "ivanp/tuple.hh"

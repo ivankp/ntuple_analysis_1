@@ -20,10 +20,10 @@
 #include "ivanp/binner/re_axes.hh"
 #include "bin_defs.hh"
 #include "ivanp/container.hh"
+#include "ivanp/scribe.hh"
+#include "ivanp/scribe/binner.hh"
 
 #include "json/JetAlgorithm.hh"
-#include "json/binner.hh"
-#include "json/bins.hh"
 
 #include "Higgs2diphoton.hh"
 
@@ -224,31 +224,26 @@ h_Njets.fill_bin(njets);
 #include STR(HIST_HJ)
 #undef HIST_HJ_END
 
-nlohmann::json out;
-auto& ann = out["annotation"];
+nlohmann::json info;
+// auto& info = out["annotation"];
 
-ann["runcard"] = runcards;
+info["runcard"] = runcards;
 
-auto& cnt = ann["count"];
+auto& cnt = info["count"];
 cnt["entries"] = num_entries;
 cnt["events"] = num_events;
 cnt["ncount"] = ncount_total;
 cnt["norm"] = ncount_total;
 
-#define CATEGORY_ANN(r, data, elem) \
-  ann_bins.push_back({STR(elem),enum_traits<elem>::all_str()});
+const string ofname = runcards["output"];
+cout << "\033[36mWriting output\033[0m: " << ofname << std::flush;
 
-ann["weights"] = weights_names;
-auto& ann_bins = ann["bins"];
-BOOST_PP_SEQ_FOR_EACH(CATEGORY_ANN,,CATEGORIES)
-ann_bins.push_back({"bin",{{"w","w2"},"n"}});
+ivanp::scribe::writer writer(ofname);
 
-auto& hists = out["histograms"];
-
-hists["Njets_excl"] = h_Njets;
+writer("Njets_excl",h_Njets);
 auto h_Njets_incl = h_Njets;
 h_Njets_incl.integrate_left();
-hists["Njets_incl"] = h_Njets_incl;
+writer("Njets_incl",h_Njets_incl);
 
 #ifndef HIST_MAX_D
 #define HIST_MAX_D 1
@@ -256,13 +251,19 @@ hists["Njets_incl"] = h_Njets_incl;
 
 #define WITH_COMMAS(z, n, text) ,text
 #define SAVE_HISTS(z, n, text) \
+  writer.add_type<hist<1 BOOST_PP_REPEAT(n,WITH_COMMAS,0)>>(); \
   for (const auto& h : hist<1 BOOST_PP_REPEAT(n,WITH_COMMAS,0)>::all) \
-    hists[h.name] = *h;
+    writer(h.name,*h);
 BOOST_PP_REPEAT(HIST_MAX_D,SAVE_HISTS,)
 
-const string ofname = runcards["output"];
-cout << "\033[36mWriting output\033[0m: " << ofname << std::flush;
+writer.add_type<ivanp::scribe::lin_axis>();
+writer.add_type<ivanp::scribe::list_axis>();
 
+ivanp::scribe::add_bin_types<bin_t>(writer);
+
+writer.write(info.dump());
+
+/*
 try { // write output file
   std::ofstream file(ofname);
   file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
@@ -279,6 +280,7 @@ try { // write output file
        << e.what() << endl;
   return 1;
 }
+*/
 cout << " \033[32;1m✔\033[0m" << endl;
 
 #endif
