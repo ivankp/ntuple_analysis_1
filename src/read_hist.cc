@@ -1,5 +1,7 @@
 #include <iostream>
 #include <fstream>
+#include <vector>
+#include <array>
 #include <nlohmann/json.hpp>
 #include "ivanp/scribe.hh"
 #include "ivanp/functional.hh"
@@ -23,39 +25,14 @@ int main(int argc, char* argv[]) {
   nlohmann::json sel;
   std::ifstream(argv[2]) >> sel;
 
-  /*
-  auto hist = sr[sel["hist"]];
-  TEST(hist.ptr())
-  TEST(hist.type_name())
-  auto bins = hist["bins"];
-  TEST(bins.ptr())
-  TEST(bins.type_name())
-  TEST(bins.size())
-  // for (const auto& bin : bins) {
-  //   TEST(bin.type_name())
-  //   TEST((unsigned)bin.union_index())
-  // }
-  TEST(bins[1].type_name())
-  TEST((unsigned)bins[1].union_index())
-  TEST(bins[1][0].type_name())
-  TEST(bins[1][0][0].type_name())
-  TEST(bins[1][0][0]["n"].type_name())
-  TEST(bins[1]["all"]["all"]["w"].type_name())
-  TEST(bins[4]["all"]["all"]["w"][0][0].cast<double>())
-  */
-
-  /*
-  for (auto bin : sr[sel.at("hist")]["bins"]) {
-    if (bin.union_index()==0) continue;
-    bin = *bin;
-    for (;;) {
-      const char* type_name = bin.type_name();
-      TEST(type_name)
-      if (starts_with(type_name,"nlo_bin<")) break;
-      bin = bin[sel.at(type_name)];
-    }
-  }
-  */
+  std::vector<std::string> weights;
+  struct bin_t {
+    #define WEIGHT_N_VAL 2
+    std::array<double,WEIGHT_N_VAL> w;
+    long unsigned n;
+    bin_t(long unsigned n): w(), n(n) { }
+  };
+  std::vector<bin_t> hist;
 
   y_combinator([&](auto f, const auto& bins) -> void {
     for (auto bin : bins) {
@@ -65,41 +42,37 @@ int main(int argc, char* argv[]) {
       if (ui==2) f(bin);
       for (;;) {
         const char* type_name = bin.type_name();
-        TEST(type_name)
-        if (starts_with(type_name,"nlo_bin<")) break;
+        // TEST(type_name)
+        if (starts_with(type_name,"nlo_bin<")) {
+          if (weights.empty()) {
+            const auto& ws = head["types"][type_name][0];
+            auto it = ++ws.begin();
+            for (auto end=ws.end(); it!=end; ++it) {
+              weights.emplace_back();
+              it->get_to(weights.back());
+            }
+          }
+          hist.emplace_back(bin["n"].template cast<long unsigned>());
+          auto it = bin.begin();
+          const decltype(it) end = weights.size();
+          auto& w = hist.back().w;
+          for (; it!=end; ++it) { // loop over weights
+            const auto val = *it;
+            if (val.size()!=WEIGHT_N_VAL) throw error(
+              "more values per weight than expected");
+            const auto* _w = &val.template cast<double>();
+            for (unsigned i=WEIGHT_N_VAL; i; ) --i, w[i] = _w[i];
+          }
+          break;
+        }
         bin = bin[sel.at(type_name)];
       }
     }
   })( sr[sel.at("hist")]["bins"] );
 
+  for (const auto& w : weights)
+    cout << w << endl;
 
-  /*
-  TEST(hist.ptr())
-  TEST(type.num_children())
-  TEST(hist["axes"].ptr())
-  TEST(hist["axes"].type_name())
-
-  TEST(type.begin()->name)
-  TEST(type.begin()->type.name())
-  TEST((type.begin()+1)->name)
-  TEST((type.begin()+1)->type.name())
-  TEST(type[1].name())
-
-  TEST(type[0].is_array())
-  TEST(type[0].is_union())
-  TEST(type[0].memlen())
-  TEST(type[0].size())
-  TEST(type[1].is_array())
-  TEST(type[1].is_union())
-  TEST(type[1].memlen())
-  TEST(type[1].size())
-
-  TEST(hist[1].ptr())
-  */
-  // for (auto t : type) TEST(t->name())
-  // for (auto t : type[1]) TEST(t->name())
-  // for (auto t : type[1][0]) TEST(t->name())
-  // for (auto t : type[1][0][1]) TEST(t->name())
-  // TEST(hist["bins"].type_name())
-  // TEST(hist["bins"].type_name(0))
+  for (const auto& bin : hist)
+    cout << bin.w[0] << ' ' << bin.w[1] << ' ' << bin.n << endl;
 }

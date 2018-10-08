@@ -259,7 +259,7 @@ BOOST_PP_REPEAT(HIST_MAX_D,SAVE_HISTS,)
 writer.add_type<ivanp::scribe::lin_axis>();
 writer.add_type<ivanp::scribe::list_axis>();
 
-ivanp::scribe::add_bin_types<bin_t>(writer);
+ivanp::scribe::add_bin_types<bin_t>(writer,weights_names);
 
 writer.write(info.dump());
 
