@@ -4,6 +4,7 @@
 #include <array>
 #include <nlohmann/json.hpp>
 #include "ivanp/scribe.hh"
+#include "ivanp/scribe/json.hh"
 #include "ivanp/functional.hh"
 #include "ivanp/error.hh"
 #include "ivanp/string.hh"
@@ -16,28 +17,36 @@ using std::endl;
 
 using ivanp::scribe::size_type;
 using namespace ivanp;
+using nlohmann::json;
 
 int main(int argc, char* argv[]) {
   ivanp::scribe::reader sr(argv[1]);
   TEST(sr.head())
   // TEST(((const void*)sr.head().data()))
-  auto head = nlohmann::json::parse(sr.head());
-  nlohmann::json sel;
+  const json head = nlohmann::json::parse(sr.head());
+  json sel;
   std::ifstream(argv[2]) >> sel;
+  json out;
+  auto& hist = out["hist"];
+  auto& obins = hist["bins"] = json::array();
 
   std::vector<std::string> weights;
+  /*
   struct bin_t {
-    #define WEIGHT_N_VAL 2
-    std::array<double,WEIGHT_N_VAL> w;
+    std::vector<std::vector<double>> ws;
     long unsigned n;
-    bin_t(long unsigned n): w(), n(n) { }
+    bin_t(const double* w, size_type nw, long unsigned n): ws(w,w+nw), n(n) { }
   };
   std::vector<bin_t> hist;
+  */
 
   y_combinator([&](auto f, const auto& bins) -> void {
     for (auto bin : bins) {
       const auto ui = bin.union_index();
-      if (ui==0) continue;
+      if (ui==0) {
+        obins.push_back(nullptr);
+        continue;
+      }
       bin = *bin;
       if (ui==2) f(bin);
       for (;;) {
@@ -52,17 +61,25 @@ int main(int argc, char* argv[]) {
               it->get_to(weights.back());
             }
           }
-          hist.emplace_back(bin["n"].template cast<long unsigned>());
+          obins.push_back(bin);
+          /*
+          TEST(bin.type_name())
+          TEST(weights.size())
+          TEST(weights.size())
+          hist.emplace_back(
+            &bin[0].template cast<double>(), weights.size(),
+            bin["n"].template cast<long unsigned>()
+          );
+
           auto it = bin.begin();
           const decltype(it) end = weights.size();
-          auto& w = hist.back().w;
+          auto& ws = hist.back().w;
           for (; it!=end; ++it) { // loop over weights
             const auto val = *it;
-            if (val.size()!=WEIGHT_N_VAL) throw error(
-              "more values per weight than expected");
             const auto* _w = &val.template cast<double>();
             for (unsigned i=WEIGHT_N_VAL; i; ) --i, w[i] = _w[i];
           }
+          */
           break;
         }
         bin = bin[sel.at(type_name)];
@@ -73,6 +90,7 @@ int main(int argc, char* argv[]) {
   for (const auto& w : weights)
     cout << w << endl;
 
-  for (const auto& bin : hist)
-    cout << bin.w[0] << ' ' << bin.w[1] << ' ' << bin.n << endl;
+  // for (const auto& bin : hist)
+  //   cout << bin.ws[0] << ' ' << bin.ws[1] << ' ' << bin.n << endl;
+  cout << out << endl;
 }

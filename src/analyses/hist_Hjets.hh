@@ -22,6 +22,7 @@
 #include "ivanp/container.hh"
 #include "ivanp/scribe.hh"
 #include "ivanp/scribe/binner.hh"
+#include "ivanp/scope.hh"
 
 #include "json/JetAlgorithm.hh"
 
@@ -211,7 +212,7 @@ bin_t::id<photon_cuts>(!(
 ));
 
 // Fill Histograms --------------------------------------------------
-h_Njets.fill_bin(njets);
+SCOPE_EXIT { h_Njets.fill_bin(njets); };
 
 #define HIST_HJ_LOOP
 #include STR(HIST_HJ)
