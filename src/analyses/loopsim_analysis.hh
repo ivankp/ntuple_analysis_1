@@ -61,6 +61,7 @@ loopsim::LoopSim _loopsim(
   // opt_loopsim_nborn
 );
 
+TEST(ent)
 unsigned ls_event_i = 0;
 while (_loopsim.there_is_a_next_event()) {
   TEST((ls_event_i++))
@@ -74,7 +75,6 @@ while (_loopsim.there_is_a_next_event()) {
   unsigned n25 = 0; // number of Higgs
   for (const auto& lsp : new_ls_event.particles) {
     const auto kf = lsp.flavour().flavour();
-    TEST(ent)
     TEST(kf)
     if (kf == 25) {
       if (n25) throw ivanp::error("more than one Higgs");
