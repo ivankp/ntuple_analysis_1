@@ -38,7 +38,7 @@ WHERE energy=13
         json.dump({
             "input": [{ "files": [ x[0]+'/'+x[1] ] }],
             "output": name+'_hist.json.xz',
-            "analysis": { "jets": { "min_njets": x[4] } }
+            "analysis": { "jets": { "njets_born": x[4] } }
         },card,separators=(',',':'))
 
 # for s in sets:

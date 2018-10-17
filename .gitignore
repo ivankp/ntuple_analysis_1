@@ -9,6 +9,9 @@
 !cards/
 !scripts/
 
+!ivanplib
+!loopsim
+
 !sql/*/
 sql/*.db
 

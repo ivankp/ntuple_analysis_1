@@ -61,6 +61,14 @@ bin/merge: \
 
 bin/read_hist: \
   $(BLD)/ivanp/scribe.o
+
+C_analyses/hist_Hjets := -DLOOPSIM
+bin/analyses/hist_Hjets: \
+  $(BLD)/loopsim/LoopSim.o \
+  $(BLD)/loopsim/TreeLevel.o \
+  $(BLD)/loopsim/Event.o \
+  $(BLD)/loopsim/Flavour.o \
+  $(BLD)/loopsim/FlavourPlugin.o
 # -------------------------------------------------------------------
 
 $(DEPS): $(BLD)/%.d: src/%$(EXT)
@@ -77,7 +85,7 @@ bin/%: $(BLD)/%.o
 
 $(BLD)/analyses/%.o:
 	@mkdir -pv $(dir $@)
-	$(CXX) $(CXXFLAGS) $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS) -c $(filter %$(EXT),$^) -o $@
+	$(CXX) $(CXXFLAGS) $(C_analyses/$*) $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS) -c $(filter %$(EXT),$^) -o $@
 
 bin/analyses/%: $(BLD)/analyses/%.o \
   $(BLD)/ivanp/program_options/program_options.o \
@@ -87,7 +95,7 @@ bin/analyses/%: $(BLD)/analyses/%.o \
   $(BLD)/Higgs2diphoton.o \
   $(BLD)/reweighter.o
 	@mkdir -pv $(dir $@)
-	$(CXX) $(LDFLAGS) $(filter %.o,$^) -o $@ $(LDLIBS) $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS) -lboost_iostreams
+	$(CXX) $(LDFLAGS) $(filter %.o,$^) -o $@ $(LDLIBS) $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS) -lboost_iostreams $(L_analyses/$*)
 
 endif
 

@@ -23,13 +23,16 @@
 #include "ivanp/timed_counter.hh"
 #include "ivanp/program_options.hh"
 #include "glob.hh"
-// #include "copy_file.hh"
 
 #define TEST(var) \
   std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;
 
-#define _STR(S) #S
-#define STR(S) _STR(S)
+// #define _STR(S) #S
+// #define STR(S) _STR(S)
+
+#ifndef ANALYSIS
+#error "ANALYSIS is not defined"
+#endif
 
 using std::cout;
 using std::cerr;
@@ -42,12 +45,8 @@ inline nlohmann::json::json_pointer operator "" _jp(const char* s, size_t n) {
   return nlohmann::json::json_pointer(std::string(s,n));
 }
 
-#ifndef ANALYSIS
-#error "ANALYSIS is not defined"
-#endif
-
 #define ANALYSIS_GLOBAL
-#include STR(ANALYSIS)
+#include ANALYSIS
 #undef ANALYSIS_GLOBAL
 
 int main(int argc, char* argv[]) {
@@ -68,8 +67,10 @@ int main(int argc, char* argv[]) {
   // ================================================================
 
   // Read runcards ==================================================
+  cout << "\033[36mRuncards\033[0m:" << endl;
   nlohmann::json runcards;
   for (const auto& filename : card_names) {
+    cout << "  " << filename << endl;
     nlohmann::json runcard;
     try {
       std::ifstream file(filename);
@@ -82,6 +83,9 @@ int main(int argc, char* argv[]) {
     }
     runcards.merge_patch(runcard);
   }
+
+  cout << "\033[36mOutput file\033[0m: "
+    << runcards.at("output").get<std::string>() << endl;
 
   // Chain and friend input files ===================================
   vector<string> tmp_files;
@@ -225,7 +229,7 @@ int main(int argc, char* argv[]) {
   }
 
 #define ANALYSIS_INIT
-#include STR(ANALYSIS)
+#include ANALYSIS
 #undef ANALYSIS_INIT
 
   // LOOP ===========================================================
@@ -249,13 +253,13 @@ int main(int argc, char* argv[]) {
     }
 
 #define ANALYSIS_LOOP
-#include STR(ANALYSIS)
+#include ANALYSIS
 #undef ANALYSIS_LOOP
 
   }
 
 #define ANALYSIS_END
-#include STR(ANALYSIS)
+#include ANALYSIS
 #undef ANALYSIS_END
 
   for (const string& fname : tmp_files) { // delete temporary files

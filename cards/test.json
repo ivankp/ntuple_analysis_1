@@ -4,14 +4,15 @@
     "/msu/data/t3work4/luisonig/H2jets_ggf/NTuplesFiles/H2.0j_GGFHT_RS_6500_pt25.0_eta4.5_r100_100.root"
   ]
 }],
-"entry_range": [0,0],
+"entry_range": [0,10000],
 "analysis": {
   "jets": {
     "cuts": { "pT": 30, "eta": 4.4 },
     "alg": [ "antikt", 0.4 ],
-    "min_njets": 2
+    "njets_born": 2,
+    "loopsim_R": 0.4
   },
   "binning": "/home/ivanp/work/ntuple_analysis/cards/Hjets.bins"
 },
-"output": "/home/ivanp/work/ntuple_analysis/test.dat"
+"output": "/home/ivanp/work/ntuple_analysis/test.dat.xz"
 }

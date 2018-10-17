@@ -1,12 +1,10 @@
-#ifndef HIST_HJ
-#define HIST_HJ hist_Hjets.cc
+#ifndef ANALYSIS
+#define HIST_HJ "hist_Hjets.cc"
 #include "hist_Hjets.hh"
-#endif
 
-#ifdef HIST_HJ_GLOBAL // ===============================================
+#elif defined(ANALYSIS_GLOBAL) // ===================================
 
-#endif
-#ifdef HIST_HJ_INIT // =================================================
+#elif defined(ANALYSIS_INIT) // =====================================
 
 #define HIST_MAX_D 1
 
@@ -22,7 +20,7 @@ auto h_reserve = [&](unsigned n, auto name_f) {
   return hs;
 };
 
-#define h_j_(X) auto h_jet_##X = h_reserve(min_njets+1, \
+#define h_j_(X) auto h_jet_##X = h_reserve(njets_born+1, \
   [](unsigned i){ return cat("jet",i+1,"_"#X); } );
 
 h_(HT) h_(H_pT) h_(H_y) h_(H_eta) h_(H_phi) h_(H_mass) h_(H_mass_hgam)
@@ -36,14 +34,13 @@ h_A_(pT) h_A_(y) h_A_(eta) h_A_(phi)
 h_(AA_cosTS_Hframe) h_(AA_cosTS_CSframe)
 h_(AA_pTt)
 
-auto h_Hjs_mass = h_reserve(min_njets+1,
+auto h_Hjs_mass = h_reserve(njets_born+1,
   [](unsigned i){ return cat('H',i+1,"j_mass"); } );
 
-#endif
-#ifdef HIST_HJ_LOOP // =================================================
+#elif defined(ANALYSIS_LOOP) // =====================================
 
-if (njets < min_njets) continue;
-const unsigned max_njets = std::min(njets,min_njets+1);
+if (njets < njets_born) continue;
+const unsigned max_njets = std::min(njets,njets_born+1);
 
 const double H_pT   = higgs.Pt();
 const double H_y    = higgs.Rapidity();

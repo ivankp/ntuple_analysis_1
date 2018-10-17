@@ -1,9 +1,8 @@
-#ifndef HIST_HJ
-#define HIST_HJ hist_Hj_rel.cc
+#ifndef ANALYSIS
+#define HIST_HJ "hist_Hj_rel.cc"
 #include "hist_Hjets.hh"
-#endif
 
-#ifdef HIST_HJ_GLOBAL // ============================================
+#elif defined(ANALYSIS_GLOBAL) // ===================================
 
 MAKE_ENUM(VBF_cuts,(all)(with_VBF_cuts))
 MAKE_ENUM(Nj,(all)(njets_eq)(njets_gt))
@@ -14,8 +13,7 @@ TLorentzVector root(const fj::PseudoJet& j) {
   return { j[0], j[1], j[2], j[3] };
 }
 
-#endif
-#ifdef HIST_HJ_INIT // ==============================================
+#elif defined(ANALYSIS_INIT) // =====================================
 
 #define HIST_MAX_D 1
 
@@ -34,7 +32,7 @@ h_(AA_dR)
 h_(AA_dy)
 h_(AA_dphi)
 
-#define h_Hj_(X) auto h_Hj_##X = h_reserve(min_njets+1, \
+#define h_Hj_(X) auto h_Hj_##X = h_reserve(njets_born+1, \
   [](unsigned i){ return cat("H_j",i+1,"_"#X); } );
 
 h_Hj_(pTrat)
@@ -65,14 +63,13 @@ h_Hjj_(dphi)
 h_Hjj_(pT)
 h_Hjj_(mass)
 
-#endif
-#ifdef HIST_HJ_LOOP // ==============================================
+#elif defined(ANALYSIS_LOOP) // =====================================
 
-if (njets < min_njets) continue;
-const unsigned max_njets = std::min(njets,min_njets+1);
+if (njets < njets_born) continue;
+const unsigned max_njets = std::min(njets,njets_born+1);
 
 bin_t::id<VBF_cuts>(0);
-bin_t::id<Nj>(njets > min_njets);
+bin_t::id<Nj>(njets > njets_born);
 
 const double A1_phi = photons[0].Phi();
 const double A2_phi = photons[1].Phi();
@@ -176,8 +173,7 @@ h_H_jjfb_dphi (dphi(jj.phi_std(),H_phi));
 h_H_jjfb_pT   ((higgs+jj).Pt());
 h_H_jjfb_mass ((higgs+jj).M());
 
-#endif
-#ifdef HIST_HJ_END // ===============================================
+#elif defined(ANALYSIS_END) // ======================================
 
 #endif
 

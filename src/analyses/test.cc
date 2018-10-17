@@ -1,20 +1,17 @@
-#ifndef HIST_HJ
-#define HIST_HJ test.cc
+#ifndef ANALYSIS
+#define HIST_HJ "test.cc"
 #include "hist_Hjets.hh"
-#endif
 
-#ifdef HIST_HJ_GLOBAL // ===============================================
+#elif defined(ANALYSIS_GLOBAL) // ===================================
 
-#endif
-#ifdef HIST_HJ_INIT // =================================================
+#elif defined(ANALYSIS_INIT) // =====================================
 
-h_(H_pT) 
+h_(H_pT)
 // h_(HT) h_(H_y) h_(H_eta) h_(H_phi) h_(H_mass)
 
-#endif
-#ifdef HIST_HJ_LOOP // =================================================
+#elif defined(ANALYSIS_LOOP) // =====================================
 
-if (njets < min_njets) continue;
+if (njets < njets_born) continue;
 
 const double H_pT = higgs.Pt();
 h_H_pT(H_pT);
@@ -27,6 +24,8 @@ h_H_pT(H_pT);
 // h_H_eta(higgs.Eta());
 // h_H_phi(higgs.Phi());
 // h_H_mass(higgs.M());
+
+#elif defined(ANALYSIS_END) // ======================================
 
 #endif
 

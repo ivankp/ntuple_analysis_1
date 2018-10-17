@@ -1,9 +1,13 @@
 #ifndef ANALYSIS
-#define ANALYSIS hist_Hjets.hh
+#ifndef LOOPSIM
+#define ANALYSIS "hist_Hjets.hh"
 #include "analysis.hh"
+#else
+#define ANALYSIS_LS "hist_Hjets.hh"
+#include "loopsim_analysis.hh"
 #endif
 
-#ifdef ANALYSIS_GLOBAL // ===========================================
+#elif defined(ANALYSIS_GLOBAL) // ===================================
 
 #include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/iostreams/filter/lzma.hpp>
@@ -43,9 +47,7 @@ isp get_isp(Int_t id1, Int_t id2) noexcept {
 
 MAKE_ENUM(photon_cuts,(all)(with_photon_cuts))
 
-#define HIST_HJ_GLOBAL
-#include STR(HIST_HJ)
-#undef HIST_HJ_GLOBAL
+#include HIST_HJ
 
 #ifndef CATEGORIES
 #define CATEGORIES (photon_cuts)(isp)
@@ -68,8 +70,7 @@ TLorentzVector& operator+=(TLorentzVector& a, const fastjet::PseudoJet& b) {
   a[0] += b[0]; a[1] += b[1]; a[2] += b[2]; a[3] += b[3]; return a;
 }
 
-#endif
-#ifdef ANALYSIS_INIT // =============================================
+#elif defined(ANALYSIS_INIT) // =====================================
 
 branch_reader<Int_t> _id(reader,"id");
 branch_reader<Int_t> _nparticle(reader,"nparticle");
@@ -87,7 +88,7 @@ for ( auto bo : *reader.GetTree()->GetListOfBranches() ) {
 branch_reader<Int_t> _id1(reader,"id1"), _id2(reader,"id2");
 
 const auto& conf = runcards.at("analysis");
-const unsigned min_njets = conf.value("/jets/min_njets"_jp,0);
+const unsigned njets_born = conf.value("/jets/njets_born"_jp,0);
 
 const std::string bfname = conf.at("binning");
 cout << "\033[36mBinning\033[0m: " << bfname << '\n' << endl;
@@ -98,7 +99,7 @@ nlo_bin_t::weights.resize(weights.size());
 
 ivanp::binner<bin_t, std::tuple<ivanp::axis_spec<
     ivanp::uniform_axis<int>,0,1
-  >>> h_Njets({min_njets+2u,0,(int)min_njets+2});
+  >>> h_Njets({njets_born+2u,0,(int)njets_born+2});
 
 #define H_MACRO(_1,_2,_3,NAME,...) NAME
 #define h_(...) H_MACRO(__VA_ARGS__, h3_, h2_, h1_)(__VA_ARGS__)
@@ -126,19 +127,17 @@ Higgs2diphoton Hdecay;
 Higgs2diphoton::photons_type photons;
 TLorentzVector higgs;
 
-#define HIST_HJ_INIT
-#include STR(HIST_HJ)
-#undef HIST_HJ_INIT
+#include HIST_HJ
 
 fj::ClusterSequence::print_banner(); // get it out of the way
 cout << jet_def.description() << endl;
-cout << "\033[36mNjets\033[0m >= " << min_njets << endl;
+cout << "\033[36mNjets\033[0m >= " << njets_born << endl;
 
-#endif
-#ifdef ANALYSIS_LOOP // =============================================
+#elif defined(ANALYSIS_LOOP) // =====================================
 
+#ifndef LOOPSIM
 // Reset ------------------------------------------------------------
-const size_t np = *_nparticle;
+const unsigned np = *_nparticle;
 partons.clear();
 
 for (unsigned i=weights.size(); i--; ) // set weights
@@ -157,7 +156,7 @@ if (new_id) {
 // Read particles ---------------------------------------------------
 unsigned n22 = 0; // number of photons
 unsigned n25 = 0; // number of Higgs
-for (size_t i=0; i<np; ++i) {
+for (unsigned i=0; i<np; ++i) {
   if (_kf[i] == 25) {
     if (n25) throw std::runtime_error("more than one Higgs");
     higgs.SetPxPyPzE(_px[i],_py[i],_pz[i],_E[i]);
@@ -171,23 +170,22 @@ for (size_t i=0; i<np; ++i) {
   }
 }
 if (!n25 && n22!=2) throw std::runtime_error("missing Higgs or photons");
-
-bin_t::id<isp>((unsigned)get_isp(*_id1,*_id2));
 // ------------------------------------------------------------------
 
 // Jets -------------------------------------------------------------
 auto fj_seq = fj::ClusterSequence(partons,jet_def);
-jets = fj_seq.inclusive_jets(jet_pt_cut); // apply pT cut
-// apply eta cut
-for (auto it=jets.begin(); it!=jets.end(); ) {
-  if (std::abs(it->eta()) > jet_eta_cut) it = jets.erase(it);
-  else ++it;
-}
+jets = fj_seq.inclusive_jets(); // get clustered jets
+
+#endif // not loopsim
+
+// apply jet cuts
+jets.erase( std::remove_if( jets.begin(), jets.end(), [=](const auto& jet){
+  return (jet.pt() < jet_pt_cut)
+  or (std::abs(jet.eta()) > jet_eta_cut);
+}), jets.end() );
 // sort by pT
 std::sort( jets.begin(), jets.end(),
-  [](const fj::PseudoJet& a, const fj::PseudoJet& b){
-    return ( a.pt() > b.pt() );
-  });
+  [](const auto& a, const auto& b){ return ( a.pt() > b.pt() ); });
 // resulting number of jets
 const unsigned njets = jets.size();
 
@@ -211,22 +209,18 @@ bin_t::id<photon_cuts>(!(
   photon_eta_cut(std::abs(A2_eta))
 ));
 
+bin_t::id<isp>((unsigned)get_isp(*_id1,*_id2));
+
 // Fill Histograms --------------------------------------------------
 SCOPE_EXIT { h_Njets.fill_bin(njets); };
 
-#define HIST_HJ_LOOP
-#include STR(HIST_HJ)
-#undef HIST_HJ_LOOP
+#include HIST_HJ
 
-#endif
-#ifdef ANALYSIS_END // ==============================================
+#elif defined(ANALYSIS_END) // ======================================
 
-#define HIST_HJ_END
-#include STR(HIST_HJ)
-#undef HIST_HJ_END
+#include HIST_HJ
 
 nlohmann::json info;
-// auto& info = out["annotation"];
 
 info["runcard"] = runcards;
 
@@ -236,15 +230,14 @@ cnt["events"] = num_events;
 cnt["ncount"] = ncount_total;
 cnt["norm"] = ncount_total;
 
-const string ofname = runcards["output"];
-cout << "\033[36mWriting output\033[0m: " << ofname << std::flush;
+cout << "\033[36mPreparing output\033[0m" << endl;
 
-ivanp::scribe::writer writer(ofname);
+ivanp::scribe::writer out;
 
-writer("Njets_excl",h_Njets);
+out("Njets_excl",h_Njets);
 auto h_Njets_incl = h_Njets;
 h_Njets_incl.integrate_left();
-writer("Njets_incl",h_Njets_incl);
+out("Njets_incl",h_Njets_incl);
 
 #ifndef HIST_MAX_D
 #define HIST_MAX_D 1
@@ -252,19 +245,20 @@ writer("Njets_incl",h_Njets_incl);
 
 #define WITH_COMMAS(z, n, text) ,text
 #define SAVE_HISTS(z, n, text) \
-  writer.add_type<hist<1 BOOST_PP_REPEAT(n,WITH_COMMAS,0)>>(); \
+  out.add_type<hist<1 BOOST_PP_REPEAT(n,WITH_COMMAS,0)>>(); \
   for (const auto& h : hist<1 BOOST_PP_REPEAT(n,WITH_COMMAS,0)>::all) \
-    writer(h.name,*h);
+    out(h.name,*h);
 BOOST_PP_REPEAT(HIST_MAX_D,SAVE_HISTS,)
 
-writer.add_type<ivanp::scribe::lin_axis>();
-writer.add_type<ivanp::scribe::list_axis>();
+out.add_type<ivanp::scribe::lin_axis>();
+out.add_type<ivanp::scribe::list_axis>();
 
-ivanp::scribe::add_bin_types<bin_t>(writer,weights_names);
+ivanp::scribe::add_bin_types<bin_t>(out,weights_names);
 
-writer.write(info.dump());
+out.add_info(info.dump());
 
-/*
+const string ofname = runcards["output"];
+cout << "\033[36mWriting output\033[0m: " << ofname << std::flush;
 try { // write output file
   std::ofstream file(ofname);
   file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
@@ -281,7 +275,6 @@ try { // write output file
        << e.what() << endl;
   return 1;
 }
-*/
 cout << " \033[32;1m✔\033[0m" << endl;
 
 #endif
