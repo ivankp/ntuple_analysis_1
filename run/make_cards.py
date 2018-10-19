@@ -10,20 +10,21 @@ db  = sqlite3.connect(path+'/sql/ntuples.db')
 cur = db.cursor()
 
 # odir = path+'/run/Hjets/'
-odir = '/msu/data/t3work9/ivanp/ntuples_hists/rel/raw/'
+odir = '/msu/data/t3work9/ivanp/ntuples_hists/maggie/raw/'
 if odir[-1]!='/': odir += '/'
 print odir
 mkdir(odir)
 
 # sets = set()
 
+  # and not instr(info,"GGFHTLS")
+  # and not instr(info,"VBFHT4VBF_INCL")
+  # and not instr(info,"VBFHT4VBF_PTH200")
 for x in cur.execute('''
 SELECT dir,file,id,particle,njets,part,info
 FROM ntuples
 WHERE energy=13
-  and not instr(info,"GGFHTLS")
-  and not instr(info,"VBFHT4VBF_INCL")
-  and not instr(info,"VBFHT4VBF_PTH200")
+  and njets=1
 '''):
     name = '{3}{4}j_{5}'.format(*x)
     # sets.add(name)
@@ -37,7 +38,7 @@ WHERE energy=13
     with open(name+'_card.json','w') as card:
         json.dump({
             "input": [{ "files": [ x[0]+'/'+x[1] ] }],
-            "output": name+'_hist.json.xz',
+            "output": name+'_hist.dat.xz',
             "analysis": { "jets": { "njets_born": x[4] } }
         },card,separators=(',',':'))
 

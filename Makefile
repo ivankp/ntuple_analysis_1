@@ -1,8 +1,8 @@
 SHELL := bash
 CXX := g++
 CPPFLAGS := -std=c++14 -Iinclude
-# CXXFLAGS := -Wall -O3 -flto -fmax-errors=3 $(CPPFLAGS)
-CXXFLAGS := -Wall -g -fmax-errors=3 $(CPPFLAGS) -DDEBUG_AT
+CXXFLAGS := -Wall -O3 -flto -fmax-errors=3 $(CPPFLAGS)
+# CXXFLAGS := -Wall -g -fmax-errors=3 $(CPPFLAGS) -DDEBUG_AT
 LDFLAGS :=
 LDLIBS :=
 
@@ -51,12 +51,13 @@ C_Higgs2diphoton := $(ROOT_CXXFLAGS)
 
 C_reweighter := $(ROOT_CXXFLAGS) $(LHAPDF_CXXFLAGS)
 
+L_merge_json := -lboost_iostreams -lboost_regex
 L_merge := -lboost_iostreams -lboost_regex
 
 C_check_tree := $(ROOT_CXXFLAGS)
 L_check_tree := $(ROOT_LDLIBS) -lTreePlayer
 
-bin/merge: \
+bin/merge bin/merge_json: \
   $(BLD)/ivanp/program_options/program_options.o
 
 bin/read_hist: \

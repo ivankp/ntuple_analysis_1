@@ -2,7 +2,6 @@
 #include <fstream>
 #include <vector>
 #include <array>
-#include <nlohmann/json.hpp>
 #include "ivanp/scribe.hh"
 #include "ivanp/scribe/json.hh"
 #include "ivanp/functional.hh"
@@ -20,10 +19,14 @@ using namespace ivanp;
 using nlohmann::json;
 
 int main(int argc, char* argv[]) {
+  if (argc!=3) {
+    cout << "usage: " << argv[0] << " file.dat[.xz] selection.json\n";
+    return 1;
+  }
   ivanp::scribe::reader sr(argv[1]);
-  TEST(sr.head())
+  TEST(sr.head_str())
   // TEST(((const void*)sr.head().data()))
-  const json head = nlohmann::json::parse(sr.head());
+  const json& head = sr.head();
   json sel;
   std::ifstream(argv[2]) >> sel;
   json out;
@@ -82,7 +85,7 @@ int main(int argc, char* argv[]) {
           */
           break;
         }
-        bin = bin[sel.at(type_name)];
+        bin = bin[sel.value(type_name,"all")];
       }
     }
   })( sr[sel.at("hist")]["bins"] );
