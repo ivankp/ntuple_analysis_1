@@ -2,6 +2,8 @@
 #include <fstream>
 #include <vector>
 #include <array>
+
+#include "ivanp/io/mem_file.hh"
 #include "ivanp/scribe.hh"
 #include "ivanp/scribe/json.hh"
 #include "ivanp/functional.hh"
@@ -23,7 +25,14 @@ int main(int argc, char* argv[]) {
     cout << "usage: " << argv[0] << " file.dat[.xz] selection.json\n";
     return 1;
   }
-  ivanp::scribe::reader sr(argv[1]);
+
+  const mem_file file = (
+    ends_with(argv[1],".xz") || ends_with(argv[1],".lzma")
+    ? mem_file::pipe(cat("unxz -c ",argv[1]).c_str())
+    : mem_file::mmap(argv[1])
+  );
+
+  ivanp::scribe::reader sr(file.mem(),file.size());
   TEST(sr.head_str())
   // TEST(((const void*)sr.head().data()))
   const json& head = sr.head();

@@ -60,7 +60,11 @@ L_check_tree := $(ROOT_LDLIBS) -lTreePlayer
 bin/merge bin/merge_json: \
   $(BLD)/ivanp/program_options/program_options.o
 
+bin/merge: \
+  $(BLD)/ivanp/io/mem_file.o
+
 bin/read_hist: \
+  $(BLD)/ivanp/io/mem_file.o \
   $(BLD)/ivanp/scribe.o
 
 C_analyses/hist_Hjets := -DLOOPSIM
@@ -92,6 +96,7 @@ bin/analyses/%: $(BLD)/analyses/%.o \
   $(BLD)/ivanp/program_options/program_options.o \
   $(BLD)/ivanp/binner/re_axes.o \
   $(BLD)/glob.o \
+  $(BLD)/ivanp/io/mem_file.o \
   $(BLD)/ivanp/scribe.o \
   $(BLD)/Higgs2diphoton.o \
   $(BLD)/reweighter.o
