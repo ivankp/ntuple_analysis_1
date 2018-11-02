@@ -6,7 +6,7 @@
 
 #include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/iostreams/filter/lzma.hpp>
-#include <boost/regex.hpp>
+// #include <boost/regex.hpp>
 
 #include "ivanp/error.hh"
 #include "ivanp/tuple.hh"
@@ -84,17 +84,18 @@ int main(int argc, char* argv[]) {
   // ================================================================
 
   mem_file first_file;
-  scribe::reader first, in;
+  scribe::reader first;
 
   for (const char* ifname : ifnames) {
-    // TEST(ifname)
+    cout << "> " << ifname << endl;
     mem_file file = (
       ends_with(ifname,".xz") || ends_with(ifname,".lzma")
       ? mem_file::pipe(cat("unxz -c ",ifname).c_str())
       : mem_file::read(ifname)
+      // : (!first ? mem_file::read(ifname) : mem_file::mmap(ifname))
     );
 
-    in = { file.mem(), file.size() };
+    scribe::reader in(file.mem(), file.size());
     auto& head = in.head();
     auto& info = head.at("info");
     auto& runcard = info.at("runcard");
@@ -102,14 +103,9 @@ int main(int argc, char* argv[]) {
     runcard.erase("input");
     runcard.erase("output");
 
-    const auto offset = [m = file.mem()](void* p) -> auto& {
-      return cout << "\033[32m" << (void*)((char*)p-m) << "\033[0m";
-    };
-    // offset(in.ptr());
-    // TEST(in.memlen())
-    // TEST(file.size())
-    // TEST(in.head_str().size())
-    // TEST(in.memlen() + in.head_str().size())
+    // const auto offset = [m = file.mem()](void* p) -> auto& {
+    //   return cout << "\033[32m" << (void*)((char*)p-m) << "\033[0m";
+    // };
 
     if (!first) {
       first_file = std::move(file);
@@ -120,60 +116,46 @@ int main(int argc, char* argv[]) {
 
         // TODO: merge counts
 
-        // cout << "***********" << endl;
-        together(first,in,[&](auto first, auto in){
+        together(first,in,[](auto first, auto in){
           if (first["axes"] != in["axes"]) throw error(
             "histograms \"","!!TODO!!","\" have different axes"
           );
-          // TEST(in.type_name())
-          // offset(in.ptr());
-          // TEST(first.memlen())
-          y_combinator([&](auto f, auto first, auto in) -> void {
-            const auto type = first.get_type();
-            // TEST(type.name())
-            offset(in.ptr()) << " " << type.name() << endl;
-            together(first,in,[&](auto first, auto in) -> void {
+          y_combinator([](auto f, auto first, auto in) -> void {
+            together(first,in,
+            y_combinator([&f](auto g, auto first, auto in) -> void {
               const auto type = first.get_type();
-              offset(in.ptr()) << " " << type.name()
-                << " " << type.is_union();
-              if (type.is_union()) { cout
-                << " " << (unsigned)in.union_index()
-                << " " << (*in).get_type().is_null()
-              ;}
-              cout << endl;
-              const char* type_name = type.name();
-              // TEST(type.name())
-              // offset(in.ptr());
               if (type.is_null()) return;
-              if (type.is_union()) {
+              else if (type.is_union()) {
                 if (first.union_index() != in.union_index())
                   throw error("union index mismatch");
-                first = *first;
-                if (first.get_type().is_null()) return;
-                f(first,*in);
+                g(*first,*in);
+                // do {
+                //   first = *first;
+                //   in = *in;
+                //   type = first.get_type();
+                // } while (type.is_union());
+                // if (!type.is_null()) f(first,in);
               }
-              else if (!type.is_fundamental()) f(first,in);
-              else {
-                if (strlen(type_name)==2) { // add values
-                  const char t = type_name[0], s = type_name[1];
-                  if (t=='f') {
-                    if (s=='8') { add<double  >(first,in); return; }
-                    if (s=='4') { add<float   >(first,in); return; }
-                  } else if (t=='u') {
-                    if (s=='8') { add<uint64_t>(first,in); return; }
-                    if (s=='4') { add<uint32_t>(first,in); return; }
-                    if (s=='2') { add<uint16_t>(first,in); return; }
-                    if (s=='1') { add<uint8_t >(first,in); return; }
-                  } else if (t=='i') {
-                    if (s=='8') { add<int64_t >(first,in); return; }
-                    if (s=='4') { add<int32_t >(first,in); return; }
-                    if (s=='2') { add<int16_t >(first,in); return; }
-                    if (s=='1') { add<int8_t  >(first,in); return; }
-                  }
+              else if (type.is_fundamental()) { // add values
+                const char* type_name = type.name();
+                const char t = type_name[0], s = type_name[1];
+                if (t=='f') {
+                  if (s=='8') add<double  >(first,in); else
+                  if (s=='4') add<float   >(first,in);
+                } else if (t=='u') {
+                  if (s=='8') add<uint64_t>(first,in); else
+                  if (s=='4') add<uint32_t>(first,in); else
+                  if (s=='2') add<uint16_t>(first,in); else
+                  if (s=='1') add<uint8_t >(first,in);
+                } else if (t=='i') {
+                  if (s=='8') add<int64_t >(first,in); else
+                  if (s=='4') add<int32_t >(first,in); else
+                  if (s=='2') add<int16_t >(first,in); else
+                  if (s=='1') add<int8_t  >(first,in);
                 }
-                throw error("unknown type \"",type_name,"\"");
               }
-            });
+              else f(first,in);
+            }));
           })(first["bins"],in["bins"]);
         });
       } catch (const std::exception& e) {
@@ -181,6 +163,27 @@ int main(int argc, char* argv[]) {
         return 1;
       }
     }
-  }
+  } // end file loop
 
+  cout << "< " << ofname << std::flush;
+  try { // write output file
+    std::ofstream file(ofname);
+    file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+    if (ivanp::ends_with(ofname,".xz")) {
+      namespace bio = boost::iostreams;
+      bio::filtering_streambuf<bio::output> buf;
+      buf.push(bio::lzma_compressor(bio::lzma::best_compression));
+      buf.push(file);
+      (std::ostream(&buf) << first.head())
+        .write(first.data_ptr(),first.data_len());
+    } else {
+      (file << first.head()).write(first.data_ptr(),first.data_len());
+    }
+  } catch (const std::exception& e) {
+    cout << " \033[31;1m✘\033[0m" << endl;
+    cerr << "\033[31mError writing file\033[0m \"" << ofname << "\": "
+         << e.what() << endl;
+    return 1;
+  }
+  cout << " \033[32;1m✔\033[0m" << endl;
 }
