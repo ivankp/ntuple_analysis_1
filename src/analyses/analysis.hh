@@ -154,6 +154,11 @@ int main(int argc, char* argv[]) {
         cout << "  " << file_name << endl;
       }
     }
+    if (!chain) {
+      cerr << "\033[31mChain was not initialized\033[0m\n"
+              "most likely because no files matched input glob\n";
+      return 1;
+    }
     input["files"] = file_names;
 
     auto weights = input.find("weights"); // Add weights

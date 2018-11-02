@@ -1,8 +1,8 @@
 SHELL := bash
 CXX := g++
 CPPFLAGS := -std=c++14 -Iinclude
-CXXFLAGS := -Wall -O3 -flto -fmax-errors=3 $(CPPFLAGS)
-# CXXFLAGS := -Wall -g -fmax-errors=3 $(CPPFLAGS) -DDEBUG_AT
+# CXXFLAGS := -Wall -O3 -flto -fmax-errors=3 $(CPPFLAGS)
+CXXFLAGS := -Wall -g -fmax-errors=3 $(CPPFLAGS) -DDEBUG_AT
 LDFLAGS :=
 LDLIBS :=
 
@@ -61,7 +61,8 @@ bin/merge bin/merge_json: \
   $(BLD)/ivanp/program_options/program_options.o
 
 bin/merge: \
-  $(BLD)/ivanp/io/mem_file.o
+  $(BLD)/ivanp/io/mem_file.o \
+  $(BLD)/ivanp/scribe.o
 
 bin/read_hist: \
   $(BLD)/ivanp/io/mem_file.o \

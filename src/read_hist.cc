@@ -34,7 +34,6 @@ int main(int argc, char* argv[]) {
 
   ivanp::scribe::reader sr(file.mem(),file.size());
   TEST(sr.head_str())
-  // TEST(((const void*)sr.head().data()))
   const json& head = sr.head();
   json sel;
   std::ifstream(argv[2]) >> sel;
@@ -43,14 +42,6 @@ int main(int argc, char* argv[]) {
   auto& obins = hist["bins"] = json::array();
 
   std::vector<std::string> weights;
-  /*
-  struct bin_t {
-    std::vector<std::vector<double>> ws;
-    long unsigned n;
-    bin_t(const double* w, size_type nw, long unsigned n): ws(w,w+nw), n(n) { }
-  };
-  std::vector<bin_t> hist;
-  */
 
   y_combinator([&](auto f, const auto& bins) -> void {
     for (auto bin : bins) {
@@ -63,7 +54,6 @@ int main(int argc, char* argv[]) {
       if (ui==2) f(bin);
       for (;;) {
         const char* type_name = bin.type_name();
-        // TEST(type_name)
         if (starts_with(type_name,"nlo_bin<")) {
           if (weights.empty()) {
             const auto& ws = head["types"][type_name][0];
@@ -74,24 +64,6 @@ int main(int argc, char* argv[]) {
             }
           }
           obins.push_back(bin);
-          /*
-          TEST(bin.type_name())
-          TEST(weights.size())
-          TEST(weights.size())
-          hist.emplace_back(
-            &bin[0].template cast<double>(), weights.size(),
-            bin["n"].template cast<long unsigned>()
-          );
-
-          auto it = bin.begin();
-          const decltype(it) end = weights.size();
-          auto& ws = hist.back().w;
-          for (; it!=end; ++it) { // loop over weights
-            const auto val = *it;
-            const auto* _w = &val.template cast<double>();
-            for (unsigned i=WEIGHT_N_VAL; i; ) --i, w[i] = _w[i];
-          }
-          */
           break;
         }
         bin = bin[sel.value(type_name,"all")];
@@ -102,7 +74,5 @@ int main(int argc, char* argv[]) {
   for (const auto& w : weights)
     cout << w << endl;
 
-  // for (const auto& bin : hist)
-  //   cout << bin.ws[0] << ' ' << bin.ws[1] << ' ' << bin.n << endl;
   cout << out << endl;
 }
