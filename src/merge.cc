@@ -2,7 +2,6 @@
 #include <fstream>
 #include <vector>
 #include <map>
-// #include <functional>
 
 #include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/iostreams/filter/lzma.hpp>
@@ -44,9 +43,6 @@ void compat(std::initializer_list<T> keys, const json& a, const json& b) {
 
 template <typename T>
 inline void add(scribe::value_node& a, const scribe::value_node& b) noexcept {
-  // TEST(a.ptr())
-  // TEST(reinterpret_cast<void*>(&a.cast<T&>()))
-  // TEST(a.cast<T&>())
   a.cast<T&>() += b.cast<T>();
 }
 
@@ -86,8 +82,15 @@ int main(int argc, char* argv[]) {
   mem_file first_file;
   scribe::reader first;
 
+  using count_t = long unsigned;
+  std::map<std::string,count_t> total_count;
+
   for (const char* ifname : ifnames) {
-    cout << "> " << ifname << endl;
+    if (verbose) cout << "> " << ifname << endl;
+    if (!std::ifstream(ifname)) {
+      cerr << "\033[31mError reading file\033[0m" << endl;
+      return 1;
+    }
     mem_file file = (
       ends_with(ifname,".xz") || ends_with(ifname,".lzma")
       ? mem_file::pipe(cat("unxz -c ",ifname).c_str())
@@ -102,23 +105,27 @@ int main(int argc, char* argv[]) {
     runcard.erase("entry_range");
     runcard.erase("input");
     runcard.erase("output");
+    auto& count = info.at("count");
 
-    // const auto offset = [m = file.mem()](void* p) -> auto& {
-    //   return cout << "\033[32m" << (void*)((char*)p-m) << "\033[0m";
-    // };
-
-    if (!first) {
+    if (!first) { // first file
       first_file = std::move(file);
       first = std::move(in);
-    } else {
+
+      // initialize counts
+      for (auto it=count.begin(), end=count.end(); it!=end; ++it)
+        total_count.emplace(it.key(),it->get<count_t>());
+    } else { // further files
       try {
         compat({"/info/runcard"_jp,"/root"_jp,"/types"_jp},first.head(),head);
 
-        // TODO: merge counts
+        // add counts
+        for (auto it=count.begin(), end=count.end(); it!=end; ++it)
+          total_count.at(it.key()) += it->get<count_t>();
 
-        together(first,in,[](auto first, auto in){
+        together(first,in,[=](auto first, auto in){
+          if (verbose>=2) cout << "  " << first.get_name() << endl;
           if (first["axes"] != in["axes"]) throw error(
-            "histograms \"","!!TODO!!","\" have different axes"
+            "histograms \"",first.get_name(),"\" have different axes"
           );
           y_combinator([](auto f, auto first, auto in) -> void {
             together(first,in,
@@ -129,12 +136,6 @@ int main(int argc, char* argv[]) {
                 if (first.union_index() != in.union_index())
                   throw error("union index mismatch");
                 g(*first,*in);
-                // do {
-                //   first = *first;
-                //   in = *in;
-                //   type = first.get_type();
-                // } while (type.is_union());
-                // if (!type.is_null()) f(first,in);
               }
               else if (type.is_fundamental()) { // add values
                 const char* type_name = type.name();
@@ -165,7 +166,9 @@ int main(int argc, char* argv[]) {
     }
   } // end file loop
 
-  cout << "< " << ofname << std::flush;
+  first.head()["/info/count"_jp] = total_count;
+
+  if (verbose) cout << "< " << ofname << std::flush;
   try { // write output file
     std::ofstream file(ofname);
     file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
@@ -180,10 +183,10 @@ int main(int argc, char* argv[]) {
       (file << first.head()).write(first.data_ptr(),first.data_len());
     }
   } catch (const std::exception& e) {
-    cout << " \033[31;1m✘\033[0m" << endl;
+    if (verbose) cout << " \033[31;1m✘\033[0m" << endl;
     cerr << "\033[31mError writing file\033[0m \"" << ofname << "\": "
          << e.what() << endl;
     return 1;
   }
-  cout << " \033[32;1m✔\033[0m" << endl;
+  if (verbose) cout << " \033[32;1m✔\033[0m" << endl;
 }
