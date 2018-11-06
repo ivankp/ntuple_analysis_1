@@ -5,7 +5,7 @@
 
 #include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/iostreams/filter/lzma.hpp>
-// #include <boost/regex.hpp>
+#include <boost/regex.hpp>
 
 #include "ivanp/error.hh"
 #include "ivanp/tuple.hh"
@@ -28,6 +28,13 @@ using std::tie;
 using nlohmann::json;
 using namespace ivanp;
 
+bool merge_xsec = false,
+     merge_variations = false,
+     remove_blank = false;
+int verbose = 0;
+
+using count_t = long unsigned;
+
 inline json::json_pointer operator "" _jp(const char* s, size_t n) {
   return json::json_pointer(std::string(s,n));
 }
@@ -46,6 +53,9 @@ inline void add(scribe::value_node& a, const scribe::value_node& b) noexcept {
   a.cast<T&>() += b.cast<T>();
 }
 
+template <typename T>
+inline T& as(const scribe::value_node& a) noexcept { return a.cast<T&>(); }
+
 template <typename A, typename B, typename F>
 inline void together(A& a, B& b, F&& f) {
   auto it_a = begin(a);
@@ -57,10 +67,6 @@ inline void together(A& a, B& b, F&& f) {
 int main(int argc, char* argv[]) {
   std::vector<const char*> ifnames;
   const char* ofname;
-  bool merge_xsec = false,
-       merge_variations = false,
-       remove_blank = false;
-  int verbose = 0;
 
   try {
     using namespace ivanp::po;
@@ -78,11 +84,12 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   // ================================================================
+  if (verbose && merge_xsec)
+    cout << "Will normalize to cross section" << endl;
 
   mem_file first_file;
   scribe::reader first;
 
-  using count_t = long unsigned;
   std::map<std::string,count_t> total_count;
 
   for (const char* ifname : ifnames) {
@@ -95,7 +102,6 @@ int main(int argc, char* argv[]) {
       ends_with(ifname,".xz") || ends_with(ifname,".lzma")
       ? mem_file::pipe(cat("unxz -c ",ifname).c_str())
       : mem_file::read(ifname)
-      // : (!first ? mem_file::read(ifname) : mem_file::mmap(ifname))
     );
 
     scribe::reader in(file.mem(), file.size());
@@ -105,36 +111,65 @@ int main(int argc, char* argv[]) {
     runcard.erase("entry_range");
     runcard.erase("input");
     runcard.erase("output");
+
+    // add counts
     auto& count = info.at("count");
+    for (auto it=count.begin(), end=count.end(); it!=end; ++it)
+      total_count[it.key()] += it->get<count_t>();
+    const auto norm = count.at("norm").get<count_t>();
+    const auto norm2 = norm*norm;
+
+    if (merge_xsec) { // normalize to cross section
+      for (auto hist : in) {
+        y_combinator([=](auto f, auto bins) -> void {
+          for (auto bin : bins) {
+            y_combinator([=](auto g, auto bin) -> void {
+              const auto type = bin.get_type();
+              if (type.is_null()) return;
+              else if (type.is_union()) g(*bin);
+              else if (starts_with(type.name(),"nlo_bin<")) {
+                /*
+                for (const auto& w : bin) { // loop over weights
+                  if (strcmp(w.type_name(),"f8#2")) continue;
+                  // w[0].cast<double&>() /= norm;
+                  as<double>(w[0]) /= norm;
+                  as<double>(w[1]) /= norm2;
+                }
+                */
+                const unsigned n = bin.size()-1;
+                double* w = &as<double&>(bin);
+                for (unsigned i=0; i<n; ) {
+                  w[i++] /= norm;
+                  w[i++] /= norm2;
+                }
+              }
+              else f(bin);
+            })(bin);
+          }
+        })(hist["bins"]);
+      }
+    }
 
     if (!first) { // first file
       first_file = std::move(file);
       first = std::move(in);
-
-      // initialize counts
-      for (auto it=count.begin(), end=count.end(); it!=end; ++it)
-        total_count.emplace(it.key(),it->get<count_t>());
     } else { // further files
       try {
         compat({"/info/runcard"_jp,"/root"_jp,"/types"_jp},first.head(),head);
 
-        // add counts
-        for (auto it=count.begin(), end=count.end(); it!=end; ++it)
-          total_count.at(it.key()) += it->get<count_t>();
-
-        together(first,in,[=](auto first, auto in){
+        together(first,in,[](auto first, auto in){
           if (verbose>=2) cout << "  " << first.get_name() << endl;
           if (first["axes"] != in["axes"]) throw error(
             "histograms \"",first.get_name(),"\" have different axes"
           );
           y_combinator([](auto f, auto first, auto in) -> void {
             together(first,in,
-            y_combinator([&f](auto g, auto first, auto in) -> void {
+            y_combinator([f](auto g, auto first, auto in) -> void {
               const auto type = first.get_type();
               if (type.is_null()) return;
               else if (type.is_union()) {
                 if (first.union_index() != in.union_index())
-                  throw error("union index mismatch");
+                  throw error("union type mismatch");
                 g(*first,*in);
               }
               else if (type.is_fundamental()) { // add values
@@ -166,7 +201,146 @@ int main(int argc, char* argv[]) {
     }
   } // end file loop
 
-  first.head()["/info/count"_jp] = total_count;
+  auto& head = first.head();
+
+  if (merge_xsec) total_count["norm"] = 1;
+  head["/info/count"_jp] = total_count;
+
+  char* out = first.data_ptr();
+  size_t out_len = first.data_len();
+  bool new_out = false;
+
+  if (merge_variations) { // merge variations
+    if (verbose) cout << "Merging variations" << endl;
+
+    struct w_struct { string pdf,ren,fac; vector<unsigned> scale_i,pdf_i; };
+    std::map<string,w_struct> ws;
+    vector<unsigned> other_weights;
+    using namespace boost;
+    const regex re("([^:]+):(\\d+)(?: ren:([\\d.]+))?(?: fac:([\\d.]+))?");
+    smatch m;
+    int i = -1;
+    auto& types = head.at("types");
+    auto& nlo_bin_type = types.at("nlo_bin<f8#>");
+    const auto& w_names = nlo_bin_type.at(0);
+    for (const string& w_name : w_names) {
+      if (i < 0) { ++i; continue; }
+      if (regex_match(w_name,m,re)) {
+        auto& w = ws[m[1]];
+        if (!w.scale_i.size()) {
+          w.pdf = m[2];
+          w.ren = m[3];
+          w.fac = m[4];
+          w.scale_i.push_back(i);
+          w.  pdf_i.push_back(i);
+        } else {
+          if (m[2]==w.pdf && (m[3]!=w.ren || m[4]!=w.fac))
+            w.scale_i.push_back(i);
+          else if (m[2]!=w.pdf && m[3]==w.ren && m[4]==w.fac)
+            w.pdf_i.push_back(i);
+          else throw ivanp::error("unexpected weight \"",m[0],'\"');
+        }
+      } else other_weights.push_back(i);
+      ++i;
+    }
+    for (auto i : other_weights) TEST(w_names[i+1])
+    for (const auto& w : ws) TEST(w.first);
+
+    // Note: assumes that all input weights are represented by pairs of doubles
+    // (8 byte floats) [ weight, sumw2 ]
+    // followed by an 8 byte bin count
+
+    types["envelope"] = R"(
+      [ [ "f8#2", "central", "scale_unc", "pdf_unc" ] ]
+    )"_json;
+    // auto new_nlo_bin_type = R"(
+    //   [ [ "f8#2" ], [ "envelope" ], [ "u8", "n" ] ]
+    // )"_json;
+    auto new_nlo_bin_type = R"(
+      [ [ "f8#2" ], [ "u8", "n" ] ]
+    )"_json;
+    for (auto i : other_weights) new_nlo_bin_type[0].push_back(w_names[i+1]);
+    // for (const auto& w : ws) new_nlo_bin_type[1].push_back(w.first);
+    nlo_bin_type = std::move(new_nlo_bin_type);
+
+    // new_out = true;
+    char* cur_old = out;
+    // out = new char[out_len];
+    char* cur_new = out;
+    /*
+    auto move_new_cur = [&](size_t len){
+      cur_new += len;
+      // if (cur_new > cur_old) throw error("merged weights take up more space");
+    };
+    */
+
+    for (auto hist : first) {
+      TEST(hist.get_name())
+      y_combinator([&](auto f, auto bins) -> void {
+        for (auto _bin : bins) {
+          y_combinator([&](auto g, auto bin) -> void {
+            const auto type = bin.get_type();
+            // TEST(type.name())
+            if (type.is_null()) return;
+            else if (type.is_union()) g(*bin);
+            else if (starts_with(type.name(),"nlo_bin<")) {
+              { // data between bins
+                const auto len = bin.ptr()-cur_old;
+                memmove(cur_new,cur_old,len);
+                // cur_old += bin.memlen();
+                // move_new_cur(len);
+                cur_old += len + bin.memlen();
+                cur_new += len;
+              }
+              /*
+              {
+                const auto len = bin.memlen();
+                // memmove(cur_new,cur_old,len);
+                memset(cur_new,0,len);
+                cur_old += len;
+                cur_new += len;
+              }
+              */
+              const unsigned nw = bin.size()-1;
+              double* w = &as<double&>(bin);
+              for (auto i : other_weights) { // not merged weights
+                // const auto w = bin[i];
+                // const auto len = w.memlen();
+                // memmove(cur_new, w.ptr(), len);
+                // move_new_cur(len);
+                const auto len = sizeof(double[2]);
+                memmove(cur_new, w+(i<<1), len);
+                cur_new += len;
+              }
+              /*
+              { // merged weights : TODO
+
+              }
+              */
+              { // n entries
+                // const auto n = bin["n"];
+                // const auto len = n.memlen();
+                // memmove(cur_new, n.ptr(), len);
+                // move_new_cur(len);
+                const auto len = 8;
+                memmove(cur_new, w+(nw<<1), len);
+                cur_new += len;
+              }
+            }
+            else f(bin);
+          })(_bin);
+        }
+      })(hist["bins"]);
+    }
+    const auto len = (first.data_ptr()+first.data_len())-cur_old;
+    TEST(len)
+    if (len) { // data after bins
+      memmove(cur_new,cur_old,len);
+      cur_old += len;
+      cur_new += len;
+    }
+    out_len = cur_new - out;
+  }
 
   if (verbose) cout << "< " << ofname << std::flush;
   try { // write output file
@@ -177,10 +351,9 @@ int main(int argc, char* argv[]) {
       bio::filtering_streambuf<bio::output> buf;
       buf.push(bio::lzma_compressor(bio::lzma::best_compression));
       buf.push(file);
-      (std::ostream(&buf) << first.head())
-        .write(first.data_ptr(),first.data_len());
+      (std::ostream(&buf) << first.head()).write(out,out_len);
     } else {
-      (file << first.head()).write(first.data_ptr(),first.data_len());
+      (file << first.head()).write(out,out_len);
     }
   } catch (const std::exception& e) {
     if (verbose) cout << " \033[31;1m✘\033[0m" << endl;
@@ -189,4 +362,6 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   if (verbose) cout << " \033[32;1m✔\033[0m" << endl;
+
+  if (new_out) delete[] out;
 }
