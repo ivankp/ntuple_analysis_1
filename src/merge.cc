@@ -216,42 +216,53 @@ int main(int argc, char* argv[]) {
     struct w_struct { string pdf,ren,fac; vector<unsigned> scale_i,pdf_i; };
     std::map<string,w_struct> ws;
     vector<unsigned> other_weights;
-    using namespace boost;
-    const regex re("([^:]+):(\\d+)(?: ren:([\\d.]+))?(?: fac:([\\d.]+))?");
-    smatch m;
-    int i = -1;
+    vector<string> other_names;
     auto& types = head.at("types");
     auto& nlo_bin_type = types.at("nlo_bin<f8#>");
     const auto& w_names = nlo_bin_type.at(0);
-    for (const string& w_name : w_names) {
-      if (i < 0) { ++i; continue; }
-      if (regex_match(w_name,m,re)) {
-        auto& w = ws[m[1]];
-        if (!w.scale_i.size()) {
-          w.pdf = m[2];
-          w.ren = m[3];
-          w.fac = m[4];
-          w.scale_i.push_back(i);
-          w.  pdf_i.push_back(i);
-        } else {
-          if (m[2]==w.pdf && (m[3]!=w.ren || m[4]!=w.fac))
+    const unsigned n_w_names = w_names.size()-1;
+    {
+      using namespace boost;
+      const regex re("([^:]+):(\\d+)(?: ren:([\\d.]+))?(?: fac:([\\d.]+))?");
+      smatch m;
+      int i = -1;
+      for (string&& w_name : w_names) {
+        if (i < 0) { ++i; continue; }
+        if (regex_match(w_name,m,re)) {
+          auto& w = ws[m[1]];
+          if (!w.scale_i.size()) {
+            w.pdf = m[2];
+            w.ren = m[3];
+            w.fac = m[4];
             w.scale_i.push_back(i);
-          else if (m[2]!=w.pdf && m[3]==w.ren && m[4]==w.fac)
-            w.pdf_i.push_back(i);
-          else throw ivanp::error("unexpected weight \"",m[0],'\"');
+            w.  pdf_i.push_back(i);
+          } else {
+            if (m[2]==w.pdf && (m[3]!=w.ren || m[4]!=w.fac))
+              w.scale_i.push_back(i);
+            else if (m[2]!=w.pdf && m[3]==w.ren && m[4]==w.fac)
+              w.pdf_i.push_back(i);
+            else throw ivanp::error("unexpected weight \"",m[0],'\"');
+          }
+        } else {
+          other_weights.push_back(i);
+          other_names.emplace_back(std::move(w_name));
         }
-      } else other_weights.push_back(i);
-      ++i;
+        ++i;
+      }
     }
-    for (auto i : other_weights) TEST(w_names[i+1])
-    for (const auto& w : ws) TEST(w.first);
+
+    if (verbose>=2) {
+      for (auto i : other_weights) cout << "  " << other_names[i] << '\n';
+      for (const auto& w : ws) cout << "  " << w.first << '\n';
+    }
+    cout << std::flush;
 
     // Note: assumes that all input weights are represented by pairs of doubles
     // (8 byte floats) [ weight, sumw2 ]
     // followed by an 8 byte bin count
 
     types["envelope"] = R"(
-      [ [ "f8#2", "central", "scale_unc", "pdf_unc" ] ]
+      [ [ "f8#2", "central" ], [ "[null,f8#2]", "scale_unc", "pdf_unc" ] ]
     )"_json;
     // auto new_nlo_bin_type = R"(
     //   [ [ "f8#2" ], [ "envelope" ], [ "u8", "n" ] ]
@@ -259,20 +270,21 @@ int main(int argc, char* argv[]) {
     auto new_nlo_bin_type = R"(
       [ [ "f8#2" ], [ "u8", "n" ] ]
     )"_json;
-    for (auto i : other_weights) new_nlo_bin_type[0].push_back(w_names[i+1]);
+    for (auto i : other_weights) new_nlo_bin_type[0].push_back(other_names[i]);
     // for (const auto& w : ws) new_nlo_bin_type[1].push_back(w.first);
     nlo_bin_type = std::move(new_nlo_bin_type);
 
-    // new_out = true;
+    const unsigned old_size = n_w_names*8;
+    const unsigned new_size = (other_weights.size()*8 + ws.size()*(8+(8+1)*2));
+    const unsigned size_rat = (new_size + old_size - 1) / old_size;
     char* cur_old = out;
-    // out = new char[out_len];
+    if (size_rat > 1) {
+      if (verbose>=2)
+        cout << "\033[33moutput will be larger than input\033[0m" << endl;
+      new_out = true;
+      out = new char[out_len*size_rat];
+    }
     char* cur_new = out;
-    /*
-    auto move_new_cur = [&](size_t len){
-      cur_new += len;
-      // if (cur_new > cur_old) throw error("merged weights take up more space");
-    };
-    */
 
     for (auto hist : first) {
       TEST(hist.get_name())
@@ -280,36 +292,20 @@ int main(int argc, char* argv[]) {
         for (auto _bin : bins) {
           y_combinator([&](auto g, auto bin) -> void {
             const auto type = bin.get_type();
-            // TEST(type.name())
             if (type.is_null()) return;
             else if (type.is_union()) g(*bin);
             else if (starts_with(type.name(),"nlo_bin<")) {
               { // data between bins
                 const auto len = bin.ptr()-cur_old;
                 memmove(cur_new,cur_old,len);
-                // cur_old += bin.memlen();
-                // move_new_cur(len);
                 cur_old += len + bin.memlen();
                 cur_new += len;
               }
-              /*
-              {
-                const auto len = bin.memlen();
-                // memmove(cur_new,cur_old,len);
-                memset(cur_new,0,len);
-                cur_old += len;
-                cur_new += len;
-              }
-              */
               const unsigned nw = bin.size()-1;
-              double* w = &as<double&>(bin);
+              auto* w = reinterpret_cast<double(*)[2]>(bin.ptr());
               for (auto i : other_weights) { // not merged weights
-                // const auto w = bin[i];
-                // const auto len = w.memlen();
-                // memmove(cur_new, w.ptr(), len);
-                // move_new_cur(len);
-                const auto len = sizeof(double[2]);
-                memmove(cur_new, w+(i<<1), len);
+                const auto len = sizeof(*w);
+                memmove(cur_new, w+i, len);
                 cur_new += len;
               }
               /*
@@ -318,12 +314,8 @@ int main(int argc, char* argv[]) {
               }
               */
               { // n entries
-                // const auto n = bin["n"];
-                // const auto len = n.memlen();
-                // memmove(cur_new, n.ptr(), len);
-                // move_new_cur(len);
                 const auto len = 8;
-                memmove(cur_new, w+(nw<<1), len);
+                memmove(cur_new, w+nw, len);
                 cur_new += len;
               }
             }
