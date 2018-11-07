@@ -128,14 +128,6 @@ int main(int argc, char* argv[]) {
               if (type.is_null()) return;
               else if (type.is_union()) g(*bin);
               else if (starts_with(type.name(),"nlo_bin<")) {
-                /*
-                for (const auto& w : bin) { // loop over weights
-                  if (strcmp(w.type_name(),"f8#2")) continue;
-                  // w[0].cast<double&>() /= norm;
-                  as<double>(w[0]) /= norm;
-                  as<double>(w[1]) /= norm2;
-                }
-                */
                 const unsigned n = bin.size()-1;
                 double* w = &as<double&>(bin);
                 for (unsigned i=0; i<n; ) {
@@ -261,77 +253,113 @@ int main(int argc, char* argv[]) {
     // (8 byte floats) [ weight, sumw2 ]
     // followed by an 8 byte bin count
 
-    types["envelope"] = R"(
-      [ [ "f8#2", "central" ], [ "[null,f8#2]", "scale_unc", "pdf_unc" ] ]
-    )"_json;
-    // auto new_nlo_bin_type = R"(
-    //   [ [ "f8#2" ], [ "envelope" ], [ "u8", "n" ] ]
-    // )"_json;
-    auto new_nlo_bin_type = R"(
-      [ [ "f8#2" ], [ "u8", "n" ] ]
-    )"_json;
-    for (auto i : other_weights) new_nlo_bin_type[0].push_back(other_names[i]);
-    // for (const auto& w : ws) new_nlo_bin_type[1].push_back(w.first);
-    nlo_bin_type = std::move(new_nlo_bin_type);
-
-    const unsigned old_size = n_w_names*8;
-    const unsigned new_size = (other_weights.size()*8 + ws.size()*(8+(8+1)*2));
-    const unsigned size_rat = (new_size + old_size - 1) / old_size;
-    char* cur_old = out;
-    if (size_rat > 1) {
+    if (!ws.size()) {
       if (verbose>=2)
-        cout << "\033[33moutput will be larger than input\033[0m" << endl;
+        cout << "\033[33mno weights to merge\033[0m" << endl;
+    } else {
+      // types["envelope"] = R"(
+      //   [ [ "f8#2", "central" ], [ "[null,f8#2]", "scale", "pdf" ] ]
+      // )"_json;
+      types["envelope0"] = R"([ ["f8#2", "central"] ])"_json;
+      types["envelope1"] = R"([ ["f8#2", "central", "scale"] ])"_json;
+      types["envelope2"] = R"([ ["f8#2", "central", "pdf"  ] ])"_json;
+      types["envelope3"] = R"([ ["f8#2", "central", "scale", "pdf"] ])"_json;
+      auto new_nlo_bin_type = R"([ ["f8#2"] ])"_json;
+      for (auto i : other_weights)
+        new_nlo_bin_type[0].push_back(other_names[i]);
+      for (const auto& w : ws) {
+        auto type = json::array();
+        type.push_back( w.second.scale_i.size() > 1
+          ? (w.second.pdf_i.size() > 1 ? "envelope3" : "envelope1")
+          : (w.second.pdf_i.size() > 1 ? "envelope2" : "envelope0")
+        );
+        type.push_back(w.first);
+        new_nlo_bin_type.emplace_back(std::move(type));
+      }
+      new_nlo_bin_type.push_back(R"([ "u8", "n" ])"_json);
+      nlo_bin_type = std::move(new_nlo_bin_type);
+
+      const unsigned old_size = n_w_names*8;
+      const unsigned new_size = (other_weights.size()*8 + ws.size()*(8+(8+1)*2));
+      const unsigned size_rat = (new_size + old_size - 1) / old_size;
+      char* cur_old = out;
+      if (size_rat > 1) {
+        if (verbose>=2)
+          cout << "\033[33moutput will be larger than input\033[0m" << endl;
+      }
       new_out = true;
       out = new char[out_len*size_rat];
-    }
-    char* cur_new = out;
+      char* cur_new = out;
 
-    for (auto hist : first) {
-      TEST(hist.get_name())
-      y_combinator([&](auto f, auto bins) -> void {
-        for (auto _bin : bins) {
-          y_combinator([&](auto g, auto bin) -> void {
-            const auto type = bin.get_type();
-            if (type.is_null()) return;
-            else if (type.is_union()) g(*bin);
-            else if (starts_with(type.name(),"nlo_bin<")) {
-              { // data between bins
-                const auto len = bin.ptr()-cur_old;
-                memmove(cur_new,cur_old,len);
-                cur_old += len + bin.memlen();
-                cur_new += len;
+      for (auto hist : first) {
+        TEST(hist.get_name())
+        y_combinator([&](auto f, auto bins) -> void {
+          for (auto _bin : bins) {
+            y_combinator([&](auto g, auto bin) -> void {
+              const auto type = bin.get_type();
+              if (type.is_null()) return;
+              else if (type.is_union()) g(*bin);
+              else if (starts_with(type.name(),"nlo_bin<")) {
+                { // data between bins
+                  const auto len = bin.ptr()-cur_old;
+                  memcpy(cur_new,cur_old,len);
+                  cur_old += len + bin.memlen();
+                  cur_new += len;
+                }
+                const unsigned nw = bin.size()-1;
+                auto* w = reinterpret_cast<double(*)[2]>(bin.ptr());
+                const auto w_len = sizeof(*w);
+                for (auto i : other_weights) { // not merged weights
+                  memcpy(cur_new, w+i, w_len);
+                  cur_new += w_len;
+                }
+                for (const auto& _w : ws) { // merged weights
+                  memcpy(cur_new, w+_w.second.scale_i.front(), w_len);
+                  // auto tmp = cur_new;
+                  cur_new += w_len;
+                  // TEST(w_len)
+                  std::tie(_w.second.scale_i,_w.second.pdf_i)
+                  | [&](const auto& is) {
+                    // const scribe::union_index_type ui = is.size()>1;
+                    // memcpy(cur_new, &ui, sizeof(ui));
+                    // cur_new += sizeof(ui);
+                    if (is.size()>1) {
+                      auto it = is.begin();
+                      const auto end = is.end();
+                      auto min = w[*it][0], max = min;
+                      for (++it; it!=end; ++it) {
+                        const auto& x = w[*it][0];
+                        if (x < min) min = x;
+                        if (max < x) max = x;
+                      }
+                      memcpy(cur_new, &min, sizeof(min));
+                      cur_new += sizeof(min);
+                      memcpy(cur_new, &max, sizeof(max));
+                      cur_new += sizeof(max);
+                      // TEST((sizeof(min)+sizeof(max)))
+                    }
+                  };
+                  // TEST((cur_new-tmp))
+                }
+                { // n entries
+                  const auto len = 8;
+                  memcpy(cur_new, w+nw, len);
+                  cur_new += len;
+                }
               }
-              const unsigned nw = bin.size()-1;
-              auto* w = reinterpret_cast<double(*)[2]>(bin.ptr());
-              for (auto i : other_weights) { // not merged weights
-                const auto len = sizeof(*w);
-                memmove(cur_new, w+i, len);
-                cur_new += len;
-              }
-              /*
-              { // merged weights : TODO
-
-              }
-              */
-              { // n entries
-                const auto len = 8;
-                memmove(cur_new, w+nw, len);
-                cur_new += len;
-              }
-            }
-            else f(bin);
-          })(_bin);
-        }
-      })(hist["bins"]);
+              else f(bin);
+            })(_bin);
+          }
+        })(hist["bins"]);
+      }
+      const auto len = (first.data_ptr()+first.data_len())-cur_old;
+      if (len) { // data after bins
+        memcpy(cur_new,cur_old,len);
+        cur_old += len;
+        cur_new += len;
+      }
+      out_len = cur_new - out;
     }
-    const auto len = (first.data_ptr()+first.data_len())-cur_old;
-    TEST(len)
-    if (len) { // data after bins
-      memmove(cur_new,cur_old,len);
-      cur_old += len;
-      cur_new += len;
-    }
-    out_len = cur_new - out;
   }
 
   if (verbose) cout << "< " << ofname << std::flush;

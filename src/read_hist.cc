@@ -41,38 +41,34 @@ int main(int argc, char* argv[]) {
   auto& hist = out["hist"];
   auto& obins = hist["bins"] = json::array();
 
-  std::vector<std::string> weights;
+  // std::vector<std::string> weights;
 
   y_combinator([&](auto f, const auto& bins) -> void {
     for (auto bin : bins) {
-      const auto ui = bin.union_index();
-      if (ui==0) {
-        obins.push_back(nullptr);
-        continue;
-      }
-      bin = *bin;
-      if (ui==2) f(bin);
-      for (;;) {
-        const char* type_name = bin.type_name();
-        if (starts_with(type_name,"nlo_bin<")) {
-          if (weights.empty()) {
-            const auto& ws = head["types"][type_name][0];
-            auto it = ++ws.begin();
-            for (auto end=ws.end(); it!=end; ++it) {
-              weights.emplace_back();
-              it->get_to(weights.back());
-            }
-          }
-          obins.push_back(bin);
-          break;
+      y_combinator([&](auto g, const auto& bin) -> void {
+        const auto type = bin.get_type();
+        TEST(type.name())
+        if (type.is_null()) obins.push_back(nullptr);
+        else if (type.is_union()) {
+          TEST((unsigned)bin.union_index())
+          g(*bin);
         }
-        bin = bin[sel.value(type_name,"all")];
-      }
+        else {
+          const char* type_name = type.name();
+          if (starts_with(type_name,"nlo_bin<")) {
+            obins.push_back(bin);
+          } else {
+            auto it = sel.find(type_name);
+            if (it==sel.end()) f(bin);
+            else g(bin[it->get<std::string>()]);
+          }
+        }
+      })(bin);
     }
   })( sr[sel.at("hist")]["bins"] );
 
-  for (const auto& w : weights)
-    cout << w << endl;
+  // for (const auto& w : weights)
+  //   cout << w << endl;
 
   cout << out << endl;
 }
