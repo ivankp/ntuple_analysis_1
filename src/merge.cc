@@ -28,11 +28,6 @@ using std::tie;
 using nlohmann::json;
 using namespace ivanp;
 
-bool merge_xsec = false,
-     merge_variations = false,
-     remove_blank = false;
-int verbose = 0;
-
 using count_t = long unsigned;
 
 inline json::json_pointer operator "" _jp(const char* s, size_t n) {
@@ -64,9 +59,13 @@ inline void together(A& a, B& b, F&& f) {
   for (; it_a!=end_a; ++it_a, ++it_b) f(*it_a,*it_b);
 }
 
+int verbose = 0;
+
 int main(int argc, char* argv[]) {
   std::vector<const char*> ifnames;
   const char* ofname;
+  bool merge_xsec = false,
+       merge_variations = false;
 
   try {
     using namespace ivanp::po;
@@ -76,7 +75,6 @@ int main(int argc, char* argv[]) {
       (merge_xsec,{"-x","--xsec","--nlo"},
        "merge cross sections (e.g. NLO parts)")
       (merge_variations,{"-u","--unc"},"merge scale & pdf variations")
-      (remove_blank,{"-b","--rm-blank"},"remove blank histograms")
       (verbose,'v',"verbose [0,1,2]",switch_init(1))
       .parse(argc,argv,true)) return 0;
   } catch (const std::exception& e) {
@@ -315,14 +313,9 @@ int main(int argc, char* argv[]) {
                 }
                 for (const auto& _w : ws) { // merged weights
                   memcpy(cur_new, w+_w.second.scale_i.front(), w_len);
-                  // auto tmp = cur_new;
                   cur_new += w_len;
-                  // TEST(w_len)
                   std::tie(_w.second.scale_i,_w.second.pdf_i)
                   | [&](const auto& is) {
-                    // const scribe::union_index_type ui = is.size()>1;
-                    // memcpy(cur_new, &ui, sizeof(ui));
-                    // cur_new += sizeof(ui);
                     if (is.size()>1) {
                       auto it = is.begin();
                       const auto end = is.end();
@@ -336,10 +329,8 @@ int main(int argc, char* argv[]) {
                       cur_new += sizeof(min);
                       memcpy(cur_new, &max, sizeof(max));
                       cur_new += sizeof(max);
-                      // TEST((sizeof(min)+sizeof(max)))
                     }
                   };
-                  // TEST((cur_new-tmp))
                 }
                 { // n entries
                   const auto len = 8;
