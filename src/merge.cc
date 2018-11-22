@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
               const auto type = bin.get_type();
               if (type.is_null()) return;
               else if (type.is_union()) g(*bin);
-              else if (starts_with(type.name(),"nlo_bin<")) {
+              else if (!strcmp(type.name(),"weights")) {
                 const unsigned n = bin.size()-1;
                 double* w = &as<double&>(bin);
                 for (unsigned i=0; i<n; ) {
@@ -208,8 +208,8 @@ int main(int argc, char* argv[]) {
     vector<unsigned> other_weights;
     vector<string> other_names;
     auto& types = head.at("types");
-    auto& nlo_bin_type = types.at("nlo_bin<f8#>");
-    const auto& w_names = nlo_bin_type.at(0);
+    auto& bin_type = types.at("weights");
+    const auto& w_names = bin_type.at(0);
     const unsigned n_w_names = w_names.size()-1;
     {
       using namespace boost;
@@ -262,9 +262,9 @@ int main(int argc, char* argv[]) {
       types["envelope1"] = R"([ ["f8#2", "central", "scale"] ])"_json;
       types["envelope2"] = R"([ ["f8#2", "central", "pdf"  ] ])"_json;
       types["envelope3"] = R"([ ["f8#2", "central", "scale", "pdf"] ])"_json;
-      auto new_nlo_bin_type = R"([ ["f8#2"] ])"_json;
+      auto new_bin_type = R"([ ["f8#2"] ])"_json;
       for (auto i : other_weights)
-        new_nlo_bin_type[0].push_back(other_names[i]);
+        new_bin_type[0].push_back(other_names[i]);
       for (const auto& w : ws) {
         auto type = json::array();
         type.push_back( w.second.scale_i.size() > 1
@@ -272,10 +272,10 @@ int main(int argc, char* argv[]) {
           : (w.second.pdf_i.size() > 1 ? "envelope2" : "envelope0")
         );
         type.push_back(w.first);
-        new_nlo_bin_type.emplace_back(std::move(type));
+        new_bin_type.emplace_back(std::move(type));
       }
-      new_nlo_bin_type.push_back(R"([ "u8", "n" ])"_json);
-      nlo_bin_type = std::move(new_nlo_bin_type);
+      new_bin_type.push_back(R"([ "u8", "n" ])"_json);
+      bin_type = std::move(new_bin_type);
 
       const unsigned old_size = n_w_names*8;
       const unsigned new_size = (other_weights.size()*8 + ws.size()*(8+(8+1)*2));
@@ -290,14 +290,14 @@ int main(int argc, char* argv[]) {
       char* cur_new = out;
 
       for (auto hist : first) {
-        TEST(hist.get_name())
+        // TEST(hist.get_name())
         y_combinator([&](auto f, auto bins) -> void {
           for (auto _bin : bins) {
             y_combinator([&](auto g, auto bin) -> void {
               const auto type = bin.get_type();
               if (type.is_null()) return;
               else if (type.is_union()) g(*bin);
-              else if (starts_with(type.name(),"nlo_bin<")) {
+              else if (starts_with(type.name(),"weights")) {
                 { // data between bins
                   const auto len = bin.ptr()-cur_old;
                   memcpy(cur_new,cur_old,len);

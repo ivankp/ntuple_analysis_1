@@ -1,7 +1,6 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <array>
 
 #include "ivanp/io/mem_file.hh"
 #include "ivanp/scribe.hh"
@@ -20,9 +19,14 @@ using ivanp::scribe::size_type;
 using namespace ivanp;
 using nlohmann::json;
 
+template <typename T>
+inline T& get(json& x) { return x.get_ref<T&>(); }
+template <typename T>
+inline const T& get(const json& x) { return x.get_ref<const T&>(); }
+
 int main(int argc, char* argv[]) {
-  if (argc!=3) {
-    cout << "usage: " << argv[0] << " file.dat[.xz] selection.json\n";
+  if (argc!=3 && argc!=2) {
+    cout << "usage: " << argv[0] << " file.dat[.xz] [selection.json]\n";
     return 1;
   }
 
@@ -33,42 +37,88 @@ int main(int argc, char* argv[]) {
   );
 
   ivanp::scribe::reader sr(file.mem(),file.size());
-  TEST(sr.head_str())
   const json& head = sr.head();
-  json sel;
-  std::ifstream(argv[2]) >> sel;
-  json out;
-  auto& hist = out["hist"];
-  auto& obins = hist["bins"] = json::array();
+  // TEST(sr.head_str())
 
-  // std::vector<std::string> weights;
+  json sel, out;
+  if (argc==3) {
+    std::ifstream(argv[2]) >> sel;
+  } else {
+    std::ios::sync_with_stdio(false);
+    std::cin >> sel;
+  }
+  const auto& hist_in = sr[sel.at("hist")];
+  auto& hist = out["hists"][hist_in.get_name()];
 
+  auto& axes = hist["axes"];
+  for (const auto& axis : hist_in["axes"]) {
+    json axis_obj;
+    for (const auto& x : *axis)
+      axis_obj[x.get_name()] = x;
+    axes.push_back(axis_obj);
+  }
+
+  auto& obins = hist["bins"];
+  auto& hvals = hist["values"];
   y_combinator([&](auto f, const auto& bins) -> void {
     for (auto bin : bins) {
       y_combinator([&](auto g, const auto& bin) -> void {
         const auto type = bin.get_type();
-        TEST(type.name())
+        // TEST(type.name())
         if (type.is_null()) obins.push_back(nullptr);
-        else if (type.is_union()) {
-          TEST((unsigned)bin.union_index())
-          g(*bin);
-        }
+        else if (type.is_union()) g(*bin);
         else {
           const char* type_name = type.name();
-          if (starts_with(type_name,"nlo_bin<")) {
-            obins.push_back(bin);
+          auto& name = sel[type_name];
+          if (!strcmp(type_name,"weights")) {
+            if (!name.is_null()) {
+              obins.push_back(bin[get<std::string>(name)]);
+            } else {
+              const auto& w = bin[0];
+              name = w.get_name();
+              obins.push_back(w);
+            }
+            if (hvals.empty()) {
+              const auto& w_type = bin[get<std::string>(name)].get_type();
+              // TEST(w_type.name())
+              for (const auto& weight_type : w_type)
+                hvals.push_back(weight_type.name);
+            }
           } else {
-            auto it = sel.find(type_name);
-            if (it==sel.end()) f(bin);
-            else g(bin[it->get<std::string>()]);
+            if (!name.is_null()) g(bin[get<std::string>(name)]);
+            // else f(bin); // loop over all
+            else {
+              const auto& b = bin[0];
+              name = b.get_name();
+              g(b);
+            }
           }
         }
       })(bin);
     }
-  })( sr[sel.at("hist")]["bins"] );
+  })( hist_in["bins"] );
 
-  // for (const auto& w : weights)
-  //   cout << w << endl;
+  auto& cats = hist["categories"];
+  auto& cats_sel = hist["selection"];
+  y_combinator([&](auto f, const auto& type, bool last=false) -> void {
+    const char* type_name = type.name();
+    auto& cat = cats[type_name];
+    for (const auto& child : type) {
+      if (sel[type_name]==child.name)
+        cats_sel[type_name] = cat.size();
+      // cats_sel.push_back(cat.size());
+      cat.push_back(child.name);
+    }
+    auto next_type = type[0];
+    if (!last) f(next_type,starts_with(next_type.name(),"weights"));
+  })(hist_in.get_type().find("bins")[0][1]);
+
+  auto& info = out["info"] = head.at("info");
+  try {
+    info.at("runcard").at("analysis").erase("binning");
+    info.at("runcard").erase("reweighting");
+    info.at("runcard").erase("entry_range");
+  } catch (...) { }
 
   cout << out << endl;
 }
