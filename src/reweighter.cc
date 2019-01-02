@@ -9,7 +9,7 @@
 
 #include "ivanp/error.hh"
 #include "ivanp/math/math.hh"
-#include "branch_reader.hh"
+#include "ivanp/root/branch_reader.hh"
 
 #define TEST(var) \
   std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;

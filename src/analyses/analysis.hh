@@ -9,7 +9,6 @@
 
 #include <TFile.h>
 #include <TChain.h>
-#include "branch_reader.hh"
 #include "reweighter.hh"
 
 #include <nlohmann/json.hpp>
@@ -22,6 +21,7 @@
 #include "ivanp/error.hh"
 #include "ivanp/timed_counter.hh"
 #include "ivanp/program_options.hh"
+#include "ivanp/root/branch_reader.hh"
 #include "glob.hh"
 
 #define TEST(var) \

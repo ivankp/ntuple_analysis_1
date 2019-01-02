@@ -64,7 +64,7 @@ bin/merge: \
   $(BLD)/ivanp/io/mem_file.o \
   $(BLD)/ivanp/scribe.o
 
-bin/read_hist: \
+bin/read_hist bin/list_hists: \
   $(BLD)/ivanp/io/mem_file.o \
   $(BLD)/ivanp/scribe.o
 

@@ -25,8 +25,8 @@ template <typename T>
 inline const T& get(const json& x) { return x.get_ref<const T&>(); }
 
 int main(int argc, char* argv[]) {
-  if (argc!=3 && argc!=2) {
-    cout << "usage: " << argv[0] << " file.dat[.xz] [selection.json]\n";
+  if (argc!=2 && argc!=3) {
+    cout << "usage: " << argv[0] << " file.dat[.xz] [list|selection.json]\n";
     return 1;
   }
 
@@ -35,18 +35,29 @@ int main(int argc, char* argv[]) {
     ? mem_file::pipe(cat("unxz -c ",argv[1]).c_str())
     : mem_file::mmap(argv[1])
   );
-
   ivanp::scribe::reader sr(file.mem(),file.size());
-  const json& head = sr.head();
-  // TEST(sr.head_str())
 
-  json sel, out;
+  json sel;
   if (argc==3) {
-    std::ifstream(argv[2]) >> sel;
+    if (!strcmp(argv[2],"list")) {
+      cout << "[";
+      bool first = true;
+      for (const auto& x : sr.get_type()) {
+        if (first) first = false;
+        else cout << ',';
+        cout << '\"' << x.name << '\"';
+      }
+      cout << "]";
+      return 0;
+    } else {
+      std::ifstream(argv[2]) >> sel;
+    }
   } else {
     std::ios::sync_with_stdio(false);
     std::cin >> sel;
   }
+
+  json out;
   const auto& hist_in = sr[sel.at("hist")];
   auto& hist = out["hists"][hist_in.get_name()];
 
@@ -80,7 +91,7 @@ int main(int argc, char* argv[]) {
             }
             if (hvals.empty()) {
               const auto& w_type = bin[get<std::string>(name)].get_type();
-              // TEST(w_type.name())
+              TEST(w_type.name())
               for (const auto& weight_type : w_type)
                 hvals.push_back(weight_type.name);
             }
@@ -88,6 +99,7 @@ int main(int argc, char* argv[]) {
             if (!name.is_null()) g(bin[get<std::string>(name)]);
             // else f(bin); // loop over all
             else {
+              // TEST(bin.type_name())
               const auto& b = bin[0];
               name = b.get_name();
               g(b);
@@ -113,7 +125,7 @@ int main(int argc, char* argv[]) {
     if (!last) f(next_type,starts_with(next_type.name(),"weights"));
   })(hist_in.get_type().find("bins")[0][1]);
 
-  auto& info = out["info"] = head.at("info");
+  auto& info = out["info"] = sr.head().at("info");
   try {
     info.at("runcard").at("analysis").erase("binning");
     info.at("runcard").erase("reweighting");
@@ -121,4 +133,5 @@ int main(int argc, char* argv[]) {
   } catch (...) { }
 
   cout << out << endl;
+  return 0;
 }

@@ -297,7 +297,7 @@ int main(int argc, char* argv[]) {
               const auto type = bin.get_type();
               if (type.is_null()) return;
               else if (type.is_union()) g(*bin);
-              else if (starts_with(type.name(),"weights")) {
+              else if (!strcmp(type.name(),"weights")) {
                 { // data between bins
                   const auto len = bin.ptr()-cur_old;
                   memcpy(cur_new,cur_old,len);
