@@ -91,7 +91,7 @@ int main(int argc, char* argv[]) {
             }
             if (hvals.empty()) {
               const auto& w_type = bin[get<std::string>(name)].get_type();
-              TEST(w_type.name())
+              // TEST(w_type.name())
               for (const auto& weight_type : w_type)
                 hvals.push_back(weight_type.name);
             }
