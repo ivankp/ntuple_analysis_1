@@ -13,26 +13,7 @@ EXT := .cc
 
 ifeq (0, $(words $(findstring $(MAKECMDGOALS), clean)))
 
-LDFLAGS += $(shell sed -r 's/([^:]+)(:|$$)/ -L\1/g' <<< "$$LIBRARY_PATH")
-
-ROOT_CXXFLAGS := $(shell root-config --cflags | sed 's/ -std=c++[^ ]\+//')
-ROOT_LDFLAGS  := $(shell root-config --ldflags)
-ROOT_LDLIBS   := $(shell root-config --libs)
-
-FJ_PREFIX   := $(shell fastjet-config --prefix)
-FJ_CXXFLAGS := -I$(FJ_PREFIX)/include
-FJ_LDLIBS   := -L$(FJ_PREFIX)/lib -Wl,-rpath=$(FJ_PREFIX)/lib -lfastjet
-
-LHAPDF_PREFIX   := $(shell lhapdf-config --prefix)
-LHAPDF_CXXFLAGS := $(shell lhapdf-config --cppflags)
-LHAPDF_LDLIBS   := $(shell lhapdf-config --libs) -Wl,-rpath=$(LHAPDF_PREFIX)/lib
-
-# RPATH
-rpath_script := ldd $(shell root-config --libdir)/libTreePlayer.so \
-  | sed -nr 's|.*=> (.+)/.+\.so[.0-9]* \(.*|\1|p' \
-  | sort -u \
-  | sed -nr '/^(\/usr)?\/lib/!s/^/-Wl,-rpath=/p'
-ROOT_LDLIBS += $(shell $(rpath_script))
+include flags.mk
 
 SRCS := $(shell find -L src -type f -name '*$(EXT)')
 DEPS := $(patsubst src/%$(EXT),$(BLD)/%.d,$(SRCS))
@@ -41,6 +22,9 @@ GREP_EXES := grep -rl '^ *int \+main *(' src --include='*$(EXT)'
 EXES := $(patsubst src%$(EXT),bin%, \
   $(shell $(GREP_EXES)) \
   $(wildcard src/analyses/*$(EXT)))
+
+# STUDIES_CMD := find studies -regex '.*/\(.+\)/\1\$(EXT)' | sed 's:\$(EXT)$$::'
+# STUDIES := $(shell $(STUDIES_CMD))
 
 all: $(EXES)
 
@@ -79,7 +63,7 @@ bin/analyses/hist_Hjets: \
 
 $(DEPS): $(BLD)/%.d: src/%$(EXT)
 	@mkdir -pv $(dir $@)
-	$(CXX) $(CPPFLAGS) $(C_$*) -MM -MT '$(@:.d=.o)' $< -MF $@
+	$(CXX) $(CPPFLAGS) $(C_$*) -MM -MT '$(@:.d=.o) $@' $< -MF $@
 
 $(BLD)/%.o:
 	@mkdir -pv $(dir $@)

@@ -9,12 +9,8 @@
 
 #elif defined(ANALYSIS_GLOBAL) // ===================================
 
-#include <boost/iostreams/filtering_streambuf.hpp>
-#include <boost/iostreams/filter/lzma.hpp>
 #include <boost/preprocessor/repetition/repeat.hpp>
-
 #include <TLorentzVector.h>
-
 #include <fastjet/ClusterSequence.hh>
 
 #include "ivanp/math/math.hh"
@@ -22,14 +18,25 @@
 #include "ivanp/binner.hh"
 #include "ivanp/binner/category_bin.hh"
 #include "ivanp/binner/re_axes.hh"
-#include "bin_defs.hh"
 #include "ivanp/container.hh"
+#include "ivanp/scope.hh"
+#include "bin_defs.hh"
+
+#ifdef OUTPUT_BINARY
+#include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/iostreams/filter/lzma.hpp>
 #include "ivanp/scribe.hh"
 #include "ivanp/scribe/binner.hh"
-#include "ivanp/scope.hh"
+#elif defined OUTPUT_ROOT
+#include <TDirectory.h>
+#include <TH1.h>
+#include "ivanp/root/binner.hh"
+#include <boost/preprocessor/seq/reverse.hpp>
+#else
+#error "OUTPUT_ not defined"
+#endif
 
 #include "json/JetAlgorithm.hh"
-
 #include "Higgs2diphoton.hh"
 
 using ivanp::reserve;
@@ -48,6 +55,14 @@ isp get_isp(Int_t id1, Int_t id2) noexcept {
 MAKE_ENUM(photon_cuts,(all)(with_photon_cuts))
 
 #include HIST_HJ
+
+#ifdef OUTPUT_ROOT
+void excl_labels(TH1* h, bool excl) {
+  auto* ax = h->GetXaxis();
+  for (int i=1, n=h->GetNbinsX(); i<=n; ++i)
+    ax->SetBinLabel(i,cat(excl ? "=" : ">=", i-1).c_str());
+}
+#endif
 
 #ifndef CATEGORIES
 #define CATEGORIES (photon_cuts)(isp)
@@ -71,6 +86,7 @@ TLorentzVector& operator+=(TLorentzVector& a, const fastjet::PseudoJet& b) {
 }
 
 #elif defined(ANALYSIS_INIT) // =====================================
+// this is pasted inside main()
 
 branch_reader<Int_t> _id(reader,"id");
 branch_reader<Int_t> _nparticle(reader,"nparticle");
@@ -232,16 +248,22 @@ cnt["norm"] = ncount_total;
 
 cout << "\033[36mPreparing output\033[0m" << endl;
 
-ivanp::scribe::writer out;
-
-out("Njets_excl",h_Njets);
-auto h_Njets_incl = h_Njets;
-h_Njets_incl.integrate_left();
-out("Njets_incl",h_Njets_incl);
+// ==================================================================
+const string& ofname = runcards["output"];
 
 #ifndef HIST_MAX_D
 #define HIST_MAX_D 1
 #endif
+
+auto h_Njets_incl = h_Njets;
+h_Njets_incl.integrate_left();
+
+#ifdef OUTPUT_BINARY // =============================================
+
+ivanp::scribe::writer out;
+
+out("Njets_excl",h_Njets);
+out("Njets_incl",h_Njets_incl);
 
 #define WITH_COMMAS(z, n, text) ,text
 #define SAVE_HISTS(z, n, text) \
@@ -257,7 +279,6 @@ ivanp::scribe::add_bin_types<bin_t>(out,weights_names);
 
 out.add_info(info.dump());
 
-const string ofname = runcards["output"];
 cout << "\033[36mWriting output\033[0m: " << ofname << std::flush;
 try { // write output file
   std::ofstream file(ofname);
@@ -277,5 +298,77 @@ try { // write output file
 }
 cout << " \033[32;1m✔\033[0m" << endl;
 
-#endif
+#elif defined OUTPUT_ROOT // ========================================
+
+// Open output root file for histograms
+auto fout = std::make_unique<TFile>(ofname.c_str(),"recreate");
+if (fout->IsZombie()) return 1;
+TDirectory *dir = fout.get();
+
+// TODO: make root conversion more elegant
+struct bin_converter {
+  using B = nlo_bin_t;
+  const auto& get (const B& b) const { return b.ws[B::wi]; }
+  const auto& val (const B& b) const noexcept { return get(b).w;  }
+  const auto& err2(const B& b) const noexcept { return get(b).w2; }
+  const auto& num (const B& b) const noexcept { return b.n;  }
+};
+
+#define CATEGORY_TOP(r, data, elem) \
+  bin_t::id<elem>() = 0; \
+  for (const char* dir_name : enum_traits<elem>::all_str()) { \
+    dir = dir->mkdir(dir_name);
+
+#define CATEGORY_BOT(r, data, elem) \
+    dir = dir->GetMotherDir(); \
+    ++bin_t::id<elem>(); \
+  }
+
+// write root historgrams
+nlo_bin_t::wi = 0;
+for (const auto& w : weights_names) {
+  dir = dir->mkdir(w.c_str());
+  cout << dir->GetName() << endl;
+
+  BOOST_PP_SEQ_FOR_EACH(CATEGORY_TOP,,CATEGORIES)
+
+    dir->cd();
+
+    using ivanp::root::to_root;
+    using ivanp::root::slice_to_root;
+
+    auto* _h_Njets_excl = to_root(h_Njets,"Njets_excl",bin_converter{});
+    excl_labels(_h_Njets_excl,true);
+    auto* _h_Njets_incl = to_root(h_Njets_incl,"Njets_incl",bin_converter{});
+    _h_Njets_incl->SetEntries( _h_Njets_excl->GetEntries() );
+    excl_labels(_h_Njets_incl,false);
+
+    for (auto& h : hist<1>::all) to_root(*h,h.name,bin_converter{});
+    for (auto& h : hist<1,0>::all) {
+      const auto vars = ivanp::rsplit<1>(h.name,'-');
+      slice_to_root(*h,vars[0],vars[1],bin_converter{});
+    }
+    for (auto& h : hist<1,0,0>::all) {
+      const auto vars = ivanp::rsplit<2>(h.name,'-');
+      slice_to_root(*h,vars[0],vars[1],vars[2],bin_converter{});
+    }
+
+  BOOST_PP_SEQ_FOR_EACH(CATEGORY_BOT,,BOOST_PP_SEQ_REVERSE(CATEGORIES))
+
+  dir = dir->GetMotherDir();
+  ++nlo_bin_t::wi;
+}
+
+fout->cd();
+TH1D *h_N = new TH1D("N","N",1,0,1);
+h_N->SetBinContent(1,ncount_total);
+h_N->SetEntries(num_events);
+
+fout->Write();
+
+#else
+#error "OUTPUT_ not defined"
+#endif // FORMAT
+
+#endif // ANALYSIS
 

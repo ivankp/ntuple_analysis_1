@@ -1,4 +1,7 @@
 #ifndef ANALYSIS
+
+#define OUTPUT_BINARY
+
 #define HIST_HJ "hist_Hjets.cc"
 #include "hist_Hjets.hh"
 
