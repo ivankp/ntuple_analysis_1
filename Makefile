@@ -38,6 +38,9 @@ C_reweighter := $(ROOT_CXXFLAGS) $(LHAPDF_CXXFLAGS)
 L_merge_json := -lboost_iostreams -lboost_regex
 L_merge := -lboost_iostreams -lboost_regex
 
+C_merge_root := $(ROOT_CXXFLAGS)
+L_merge_root := $(ROOT_LDLIBS)
+
 C_check_tree := $(ROOT_CXXFLAGS)
 L_check_tree := $(ROOT_LDLIBS) -lTreePlayer
 
