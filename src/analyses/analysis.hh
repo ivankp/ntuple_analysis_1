@@ -42,7 +42,7 @@ using std::vector;
 using ivanp::cat;
 
 inline nlohmann::json::json_pointer operator "" _jp(const char* s, size_t n) {
-  return nlohmann::json::json_pointer(std::string(s,n));
+  return nlohmann::json::json_pointer(string(s,n));
 }
 
 #define ANALYSIS_GLOBAL
@@ -50,13 +50,16 @@ inline nlohmann::json::json_pointer operator "" _jp(const char* s, size_t n) {
 #undef ANALYSIS_GLOBAL
 
 int main(int argc, char* argv[]) {
-  std::vector<const char*> card_names;
-  std::string tmp_dir;
+  vector<const char*> card_names;
+  string tmp_dir;
+
+  vector<string> input_ntuples;
 
   try {
     using namespace ivanp::po;
     if (program_options()
-      (card_names,'i',"json runcards",req(),pos())
+      (card_names,'r',"json runcards",req(),pos())
+      (input_ntuples,'i',"input ntuples")
       (tmp_dir,"--tmp-dir","copy input ntuples to temporary directory")
       .parse(argc,argv,true)) return 0;
     if (!tmp_dir.empty() && tmp_dir.back()!='/') tmp_dir += '/';
@@ -69,36 +72,44 @@ int main(int argc, char* argv[]) {
   // Read runcards ==================================================
   cout << "\033[36mRuncards\033[0m:" << endl;
   nlohmann::json runcards;
-  for (const auto& filename : card_names) {
+  for (const char* filename : card_names) {
     cout << "  " << filename << endl;
     nlohmann::json runcard;
-    try {
-      std::ifstream file(filename);
-      file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-      file >> runcard;
-    } catch (const std::exception& e) {
-      cerr << "\033[31mError reading file\033[0m \"" << filename << "\": "
-           << e.what() << endl;
-      return 1;
+    if (!strcmp(filename,"-")) {
+      std::cin >> runcard;
+    } else {
+      try {
+        std::ifstream file(filename);
+        file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+        file >> runcard;
+      } catch (const std::exception& e) {
+        cerr << "\033[31mError reading file\033[0m \"" << filename << "\": "
+             << e.what() << endl;
+        return 1;
+      }
     }
     runcards.merge_patch(runcard);
   }
 
   cout << "\033[36mOutput file\033[0m: "
-    << runcards.at("output").get<std::string>() << endl;
+    << runcards.at("output").get<string>() << endl;
 
   // Chain and friend input files ===================================
   vector<string> tmp_files;
   std::list<TChain> chains;
   vector<string> weights_names;
   for (auto& input : runcards.at("input")) {
-    const string info = input.value("info","");
+    const string& info = input.value("info","");
     if (!info.empty()) cout << "\033[36mInfo\033[0m: " << info << endl;
 
     TChain* chain = nullptr;
     string tree_name = input.value("tree","");
     vector<string> file_names;
-    for (const string& file_glob : input.at("files")) { // Chain input files
+    for (const string& file_glob : ( // Chain input files
+        !input_ntuples.empty()
+        ? input_ntuples
+        : input.at("files").get<vector<string>>()
+      )) {
       for (string& file_name : ivanp::glob(file_glob)) {
         if (file_name.empty() || file_name.back()=='/') {
           cerr << "\033[31mBad file_name\033[0m: \""

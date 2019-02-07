@@ -20,12 +20,12 @@ all: $(EXE)
 -include $(DEPS)
 
 # -------------------------------------------------------------------
-C_mtop := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS) $(LDFLAGS)
-L_mtop := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS)
+C_analysis := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS) $(LDFLAGS)
+L_analysis := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS)
 
 BLD := ../../.build
 
-mtop: \
+analysis: \
   $(BLD)/ivanp/program_options/program_options.o \
   $(BLD)/ivanp/binner/re_axes.o \
   $(BLD)/glob.o \

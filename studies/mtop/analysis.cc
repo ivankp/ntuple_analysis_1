@@ -2,7 +2,7 @@
 
 #define OUTPUT_ROOT
 
-#define HIST_HJ "mtop.cc"
+#define HIST_HJ "analysis.cc"
 #include "hist_Hjets.hh"
 
 #elif defined(ANALYSIS_GLOBAL) // ===================================

@@ -1,2 +1,5 @@
-mtop
+/analysis
 /*.d
+/condor
+/out
+/junk
