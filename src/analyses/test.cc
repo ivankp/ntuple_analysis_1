@@ -1,6 +1,6 @@
 #ifndef ANALYSIS
 
-#define OUTPUT_BINARY
+#define OUTPUT_ROOT
 
 #define HIST_HJ "test.cc"
 #include "hist_Hjets.hh"

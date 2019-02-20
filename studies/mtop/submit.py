@@ -13,7 +13,7 @@ project_dir = '/home/ivanp/work/ntuple_analysis'
 loc = project_dir+'/studies/mtop'
 exe = loc + '/analysis'
 
-jetR = float(sys.argv[1]) if len(sys.argv)>1 else 4
+jetR = int(sys.argv[1]) if len(sys.argv)>1 else 4
 njets = 2
 
 chunk_size = 20e6

@@ -5,7 +5,7 @@
   ],
   "weights": "weight2"
 }],
-"entry_range": [0,10000],
+"entry_range": [0,1000],
 "analysis": {
   "jets": {
     "cuts": { "pT": 30, "eta": 4.4 },
@@ -15,5 +15,5 @@
   },
   "binning": "/home/ivanp/work/ntuple_analysis/cards/Hjets.bins"
 },
-"output": "/home/ivanp/work/ntuple_analysis/test.dat"
+"output": "/home/ivanp/work/ntuple_analysis/test.root"
 }

@@ -23,11 +23,14 @@ ang_t ang(const TLorentzVector& higgs, const TLorentzVector& jet) {
   };
 };
 
-MAKE_ENUM(H_y_cat,(all)(central))
+MAKE_ENUM(H_rapidity_cut,(all)(central_higgs))
+MAKE_ENUM(fat_jet,(all)(nsubjets_1)(nsubjets_2))
 
-#define CATEGORIES (H_y_cat)(photon_cuts)(isp)
+#define CATEGORIES (isp)(photon_cuts)(H_rapidity_cut)(fat_jet)
 
 #elif defined(ANALYSIS_INIT) // =====================================
+
+h_(H_pT) h_(j1_pT) h_(j2_pT)
 
 h_(j1_nsub)
 
@@ -45,10 +48,31 @@ h_(H_cosTheta,Hj_mass)
 h_(Hj_mass,j1_x)
 h_(j1_mass,j1_x)
 
+h_(H_pT,Hj_mass)
+h_(j1_pT,Hj_mass)
+
+h_(pp_pTrat,Hj_mass)
+h_(pp_dphi,Hj_mass)
+
 #elif defined(ANALYSIS_LOOP) // =====================================
 
+// category cuts ====================================================
+
+std::sort( particles.begin(), particles.end(),
+  [](const fj::PseudoJet& a, const fj::PseudoJet& b){
+    return ( a.pt() > b.pt() );
+  });
+
 const auto H_y = higgs.Rapidity();
-bin_t::id<H_y_cat>( std::abs(H_y) < 0.1 );
+bin_t::id<H_rapidity_cut>() = ( std::abs(H_y) < 0.1 );
+
+const auto j1_nsub = jets[0].constituents().size();
+bin_t::id<fat_jet>() = j1_nsub ;
+
+// ==================================================================
+
+h_H_pT(higgs.Pt());
+h_j1_pT(jets[0].pt());
 
 h_H_y(H_y);
 
@@ -61,22 +85,29 @@ h_Hj_mass(ang_Hj1.M);
 
 h_H_cosTheta_Hj_mass(ang_Hj1.cos_theta,ang_Hj1.M);
 
-const auto j1_nsub = jets[0].constituents().size();
 h_j1_nsub(j1_nsub);
 
-if (j1_nsub>1) {
-  const double j1_mass = jets[0].m();
-  h_j1_mass(j1_mass);
+const double j1_mass = jets[0].m();
+h_j1_mass(j1_mass);
 
-  const double j1_x = j1_mass/(jet_def.R()*jets[0].pt());
-  h_j1_x(j1_x);
+const double j1_x = j1_mass/(jet_def.R()*jets[0].pt());
+h_j1_x(j1_x);
 
-  h_Hj_mass_j1_x(ang_Hj1.M,j1_x);
-  h_j1_mass_j1_x(j1_mass,j1_x);
-}
+h_Hj_mass_j1_x(ang_Hj1.M,j1_x);
+h_j1_mass_j1_x(j1_mass,j1_x);
 
-if (jets.size() < 2) continue;
 
+
+h_H_pT_Hj_mass(higgs.Pt(),ang_Hj1.M);
+h_j1_pT_Hj_mass(jets[0].pt(),ang_Hj1.M);
+
+h_pp_pTrat_Hj_mass(particles[0].pt()/particles[1].pt(),ang_Hj1.M);
+h_pp_dphi_Hj_mass(std::abs(particles[0].delta_phi_to(particles[1])),ang_Hj1.M);
+
+
+if (jets.size() < 2) continue; // --------------------------------
+
+h_j2_pT(jets[1].pt());
 h_j2_mass(jets[1].m());
 
 #endif

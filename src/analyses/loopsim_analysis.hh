@@ -20,7 +20,7 @@ branch_reader<Char_t[]> _part(reader,"part");
 
 // Reset ------------------------------------------------------------
 const unsigned np = *_nparticle;
-partons.clear();
+particles.clear();
 
 // Keep track of multi-entry events ---------------------------------
 ++num_entries;
@@ -85,7 +85,7 @@ while (_loopsim.there_is_a_next_event()) {
       photons[n22] = { lsp[0], lsp[1], lsp[2], lsp[3] };
       ++n22;
     } else {
-      partons.emplace_back(lsp);
+      particles.emplace_back(lsp);
     }
   }
   if (!n25 && n22!=2) throw ivanp::error("missing Higgs or photons");

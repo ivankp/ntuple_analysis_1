@@ -22,7 +22,7 @@
 #include "ivanp/scope.hh"
 #include "bin_defs.hh"
 
-#ifdef OUTPUT_BINARY
+#ifdef OUTPUT_SCRIBE
 #include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/iostreams/filter/lzma.hpp>
 #include "ivanp/scribe.hh"
@@ -56,14 +56,6 @@ MAKE_ENUM(photon_cuts,(all)(with_photon_cuts))
 
 #include HIST_HJ
 
-#ifdef OUTPUT_ROOT
-void excl_labels(TH1* h, bool excl) {
-  auto* ax = h->GetXaxis();
-  for (int i=1, n=h->GetNbinsX(); i<=n; ++i)
-    ax->SetBinLabel(i,cat(excl ? "=" : ">=", i-1).c_str());
-}
-#endif
-
 #ifndef CATEGORIES
 #define CATEGORIES (photon_cuts)(isp)
 #endif
@@ -73,6 +65,23 @@ using bin_t = ivanp::category_bin<nlo_bin_t,BOOST_PP_SEQ_ENUM(CATEGORIES)>;
 template <bool... OF>
 using hist = ivanp::binner<bin_t,
   std::tuple<ivanp::axis_spec<typename re_axes::axis_type,OF,OF>...> >;
+
+#ifdef OUTPUT_ROOT
+void excl_labels(TH1* h, bool excl) {
+  auto* ax = h->GetXaxis();
+  for (int i=1, n=h->GetNbinsX(); i<=n; ++i)
+    ax->SetBinLabel(i,cat(excl ? "=" : ">=", i-1).c_str());
+}
+
+namespace ivanp { namespace root {
+template <> struct bin_converter<bin_t> {
+  const auto& get (const bin_t& b) const { return (*b).ws[nlo_bin_t::wi]; }
+  const auto& val (const bin_t& b) const noexcept { return get(b).w;  }
+  const auto& err2(const bin_t& b) const noexcept { return get(b).w2; }
+  const auto& num (const bin_t& b) const noexcept { return (*b).n;  }
+};
+}}
+#endif
 
 inline bool photon_eta_cut(double abs_eta) noexcept {
   return (1.37 < abs_eta && abs_eta < 1.52) || (2.37 < abs_eta);
@@ -138,7 +147,7 @@ const fj::JetDefinition jet_def = conf.at("/jets/alg"_jp);
 Int_t prev_id = -1;
 size_t num_entries=0, num_events=0, ncount_total=0;
 
-std::vector<fj::PseudoJet> partons, jets;
+std::vector<fj::PseudoJet> particles, jets;
 Higgs2diphoton Hdecay;
 Higgs2diphoton::photons_type photons;
 TLorentzVector higgs;
@@ -154,7 +163,7 @@ cout << "\033[36mNjets\033[0m >= " << njets_born << endl;
 #ifndef LOOPSIM
 // Reset ------------------------------------------------------------
 const unsigned np = *_nparticle;
-partons.clear();
+particles.clear();
 
 for (unsigned i=weights.size(); i--; ) // set weights
   nlo_bin_t::weights[i] = weights[i];
@@ -182,14 +191,14 @@ for (unsigned i=0; i<np; ++i) {
     photons[n22].SetPxPyPzE(_px[i],_py[i],_pz[i],_E[i]);
     ++n22;
   } else {
-    partons.emplace_back(_px[i],_py[i],_pz[i],_E[i]);
+    particles.emplace_back(_px[i],_py[i],_pz[i],_E[i]);
   }
 }
 if (!n25 && n22!=2) throw std::runtime_error("missing Higgs or photons");
 // ------------------------------------------------------------------
 
 // Jets -------------------------------------------------------------
-auto fj_seq = fj::ClusterSequence(partons,jet_def);
+auto fj_seq = fj::ClusterSequence(particles,jet_def);
 jets = fj_seq.inclusive_jets(); // get clustered jets
 
 #endif // not loopsim
@@ -258,7 +267,7 @@ const string& ofname = runcards["output"];
 auto h_Njets_incl = h_Njets;
 h_Njets_incl.integrate_left();
 
-#ifdef OUTPUT_BINARY // =============================================
+#ifdef OUTPUT_SCRIBE // =============================================
 
 ivanp::scribe::writer out;
 
@@ -305,30 +314,16 @@ auto fout = std::make_unique<TFile>(ofname.c_str(),"recreate");
 if (fout->IsZombie()) return 1;
 TDirectory *dir = fout.get();
 
-// TODO: make root conversion more elegant
-struct bin_converter {
-  using B = nlo_bin_t;
-  const auto& get (const B& b) const { return b.ws[B::wi]; }
-  const auto& val (const B& b) const noexcept { return get(b).w;  }
-  const auto& err2(const B& b) const noexcept { return get(b).w2; }
-  const auto& num (const B& b) const noexcept { return b.n;  }
-};
-
-#define CATEGORY_TOP(r, data, elem) \
-  bin_t::id<elem>() = 0; \
-  for (const char* dir_name : enum_traits<elem>::all_str()) { \
-    dir = dir->mkdir(dir_name);
-
-#define CATEGORY_BOT(r, data, elem) \
-    dir = dir->GetMotherDir(); \
-    ++bin_t::id<elem>(); \
-  }
-
 // write root historgrams
 nlo_bin_t::wi = 0;
 for (const auto& w : weights_names) {
   dir = dir->mkdir(w.c_str());
   cout << dir->GetName() << endl;
+
+#define CATEGORY_TOP(r, data, elem) \
+  bin_t::id<elem>() = 0; \
+  for (const char* dir_name : enum_traits<elem>::all_str()) { \
+    dir = dir->mkdir(dir_name);
 
   BOOST_PP_SEQ_FOR_EACH(CATEGORY_TOP,,CATEGORIES)
 
@@ -337,21 +332,26 @@ for (const auto& w : weights_names) {
     using ivanp::root::to_root;
     using ivanp::root::slice_to_root;
 
-    auto* _h_Njets_excl = to_root(h_Njets,"Njets_excl",bin_converter{});
+    auto* _h_Njets_excl = to_root(h_Njets,"Njets_excl");
     excl_labels(_h_Njets_excl,true);
-    auto* _h_Njets_incl = to_root(h_Njets_incl,"Njets_incl",bin_converter{});
+    auto* _h_Njets_incl = to_root(h_Njets_incl,"Njets_incl");
     _h_Njets_incl->SetEntries( _h_Njets_excl->GetEntries() );
     excl_labels(_h_Njets_incl,false);
 
-    for (auto& h : hist<1>::all) to_root(*h,h.name,bin_converter{});
+    for (auto& h : hist<1>::all) to_root(*h,h.name);
     for (auto& h : hist<1,0>::all) {
       const auto vars = ivanp::rsplit<1>(h.name,'-');
-      slice_to_root(*h,vars[0],vars[1],bin_converter{});
+      slice_to_root(*h,vars[0],vars[1]);
     }
     for (auto& h : hist<1,0,0>::all) {
       const auto vars = ivanp::rsplit<2>(h.name,'-');
-      slice_to_root(*h,vars[0],vars[1],vars[2],bin_converter{});
+      slice_to_root(*h,vars[0],vars[1],vars[2]);
     }
+
+#define CATEGORY_BOT(r, data, elem) \
+    dir = dir->GetMotherDir(); \
+    ++bin_t::id<elem>(); \
+  }
 
   BOOST_PP_SEQ_FOR_EACH(CATEGORY_BOT,,BOOST_PP_SEQ_REVERSE(CATEGORIES))
 
