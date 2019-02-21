@@ -35,7 +35,7 @@ h_(AA_dR)
 h_(AA_dy)
 h_(AA_dphi)
 
-#define h_Hj_(X) auto h_Hj_##X = h_reserve(njets_born+1, \
+#define h_Hj_(X) auto h_Hj_##X = h_reserve(njets_min+1, \
   [](unsigned i){ return cat("H_j",i+1,"_"#X); } );
 
 h_Hj_(pTrat)
@@ -68,11 +68,11 @@ h_Hjj_(mass)
 
 #elif defined(ANALYSIS_LOOP) // =====================================
 
-if (njets < njets_born) continue;
-const unsigned max_njets = std::min(njets,njets_born+1);
+if (njets < njets_min) continue;
+const unsigned max_njets = std::min(njets,njets_min+1);
 
 bin_t::id<VBF_cuts>(0);
-bin_t::id<Nj>(njets > njets_born);
+bin_t::id<Nj>(njets > njets_min);
 
 const double A1_phi = photons[0].Phi();
 const double A2_phi = photons[1].Phi();

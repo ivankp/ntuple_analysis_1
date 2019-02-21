@@ -14,14 +14,14 @@ for x in $(
   rm tmp.root
 done
 
-for x in $(
-  ls *.root |
-  sed 's/_\(eft\|mtop\)_/__/' |
-  sort -u
-); do
-  hrat \
-    $(sed 's/__/_mtop_/' <<< $x) \
-    $(sed 's/__/_eft_/' <<< $x) \
-    $(sed 's/__/_rat_/' <<< $x)
-done
+# for x in $(
+#   ls *.root |
+#   sed 's/_\(eft\|mtop\)_/__/' |
+#   sort -u
+# ); do
+#   hrat \
+#     $(sed 's/__/_mtop_/' <<< $x) \
+#     $(sed 's/__/_eft_/' <<< $x) \
+#     $(sed 's/__/_rat_/' <<< $x)
+# done
 

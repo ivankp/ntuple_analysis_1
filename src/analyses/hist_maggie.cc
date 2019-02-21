@@ -38,8 +38,8 @@ h_(AA_dphi)
 
 #elif defined(ANALYSIS_LOOP) // =====================================
 
-if (njets < njets_born) continue;
-// const unsigned max_njets = std::min(njets,njets_born+1);
+if (njets < njets_min) continue;
+// const unsigned max_njets = std::min(njets,njets_min+1);
 
 const double H_mass = higgs.M();
 

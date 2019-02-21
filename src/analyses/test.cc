@@ -14,7 +14,7 @@
 
 #elif defined(ANALYSIS_LOOP) // =====================================
 
-if (njets < njets_born) continue;
+if (njets < njets_min) continue;
 
 // const double H_pT = higgs.Pt();
 // h_H_pT(H_pT);

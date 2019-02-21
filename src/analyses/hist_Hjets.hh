@@ -113,7 +113,7 @@ for ( auto bo : *reader.GetTree()->GetListOfBranches() ) {
 branch_reader<Int_t> _id1(reader,"id1"), _id2(reader,"id2");
 
 const auto& conf = runcards.at("analysis");
-const unsigned njets_born = conf.value("/jets/njets_born"_jp,0);
+const unsigned njets_min = conf.value("/jets/njets_min"_jp,0);
 
 const std::string bfname = conf.at("binning");
 cout << "\033[36mBinning\033[0m: " << bfname << '\n' << endl;
@@ -124,7 +124,7 @@ nlo_bin_t::weights.resize(weights.size());
 
 ivanp::binner<bin_t, std::tuple<ivanp::axis_spec<
     ivanp::uniform_axis<int>,0,1
-  >>> h_Njets({njets_born+2u,0,(int)njets_born+2});
+  >>> h_Njets({njets_min+2u,0,(int)njets_min+2});
 
 #define H_MACRO(_1,_2,_3,NAME,...) NAME
 #define h_(...) H_MACRO(__VA_ARGS__, h3_, h2_, h1_)(__VA_ARGS__)
@@ -156,7 +156,7 @@ TLorentzVector higgs;
 
 fj::ClusterSequence::print_banner(); // get it out of the way
 cout << jet_def.description() << endl;
-cout << "\033[36mNjets\033[0m >= " << njets_born << endl;
+cout << "\033[36mNjets\033[0m >= " << njets_min << endl;
 
 #elif defined(ANALYSIS_LOOP) // =====================================
 
@@ -192,6 +192,7 @@ for (unsigned i=0; i<np; ++i) {
     ++n22;
   } else {
     particles.emplace_back(_px[i],_py[i],_pz[i],_E[i]);
+    particles.back().set_user_index(i);
   }
 }
 if (!n25 && n22!=2) throw std::runtime_error("missing Higgs or photons");

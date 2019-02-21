@@ -13,7 +13,7 @@ project_dir = '/home/ivanp/work/ntuple_analysis'
 loc = project_dir+'/studies/mtop'
 exe = loc + '/analysis'
 
-jetR = int(sys.argv[1]) if len(sys.argv)>1 else 4
+jetR = float(sys.argv[1]) if len(sys.argv)>1 else 4
 njets = 2
 
 chunk_size = 20e6
@@ -33,7 +33,7 @@ SELECT dir,file,particle,njets,part,info,nentries
 FROM ntuples
 WHERE info="{}" and njets={} and particle="H" and energy=13 and part="B"
 '''.format(info,nj))
-    fs = [ ( x[-1], x[0]+'/'+x[1], '{}{}j{}_{}_antikt{}'.format(
+    fs = [ ( x[-1], x[0]+'/'+x[1], '{}{}j{}_{}_antikt{:g}'.format(
         x[2], x[3], x[4], ('mtop' if ('mtop' in x[5]) else 'eft'), jetR
     )) for x in cur.fetchall() ]
     pref = set([x[2] for x in fs])
@@ -72,7 +72,7 @@ CARD
   'jets': {
     "cuts": { "pT": 30, "eta": 4.4 },
     "alg": [ "antikt", jetR*0.1 ],
-    "njets_born": 1
+    "njets_min": 1
   },
   'binning': loc+'/mtop.bins'
   },

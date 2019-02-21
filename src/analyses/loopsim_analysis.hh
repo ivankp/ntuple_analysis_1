@@ -37,11 +37,11 @@ int nloops = 1, event_order = 1;
 switch (part) {
   case 'B': { nloops = 0; event_order = 0; break; }
   case 'R': {
-    if (np==njets_born) { nloops = 0; } break;
-    if (njets_born > np) throw ivanp::error(
-      "njets_born(",njets_born,") > np(",np,')');
-    if (njets_born+1 < np) throw ivanp::error(
-      "njets_born(",njets_born,")+1 < np(",np,')');
+    if (np==njets_min) { nloops = 0; } break;
+    if (njets_min > np) throw ivanp::error(
+      "njets_min(",njets_min,") > np(",np,')');
+    if (njets_min+1 < np) throw ivanp::error(
+      "njets_min(",njets_min,")+1 < np(",np,')');
   }
   default: ;
 }
@@ -57,7 +57,7 @@ for (unsigned i=0; i<np; ++i) {
 ls_event.weight = 1;
 
 loopsim::LoopSim _loopsim(
-  event_order, nloops, ls_event, loopsim_R, njets_born
+  event_order, nloops, ls_event, loopsim_R, njets_min
   // opt_loopsim_nborn
 );
 

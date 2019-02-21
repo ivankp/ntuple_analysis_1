@@ -25,8 +25,10 @@ ang_t ang(const TLorentzVector& higgs, const TLorentzVector& jet) {
 
 MAKE_ENUM(H_rapidity_cut,(all)(central_higgs))
 MAKE_ENUM(fat_jet,(all)(nsubjets_1)(nsubjets_2))
+MAKE_ENUM(p1_flavor,(all)(p1_g)(p1_q))
+MAKE_ENUM(p2_flavor,(all)(p2_g)(p2_q))
 
-#define CATEGORIES (isp)(photon_cuts)(H_rapidity_cut)(fat_jet)
+#define CATEGORIES (isp)(photon_cuts)(H_rapidity_cut)(fat_jet)(p1_flavor)(p2_flavor)
 
 #elif defined(ANALYSIS_INIT) // =====================================
 
@@ -64,10 +66,15 @@ std::sort( particles.begin(), particles.end(),
   });
 
 const auto H_y = higgs.Rapidity();
-bin_t::id<H_rapidity_cut>() = ( std::abs(H_y) < 0.1 );
+bin_t::id<H_rapidity_cut>( std::abs(H_y) < 0.1 );
 
 const auto j1_nsub = jets[0].constituents().size();
-bin_t::id<fat_jet>() = j1_nsub ;
+bin_t::id<fat_jet>(j1_nsub);
+
+if (particles.size()>=1)
+  bin_t::id<p1_flavor>(_kf[particles[0].user_index()]==21 ? 1 : 2 );
+if (particles.size()>=2)
+  bin_t::id<p2_flavor>(_kf[particles[1].user_index()]==21 ? 1 : 2 );
 
 // ==================================================================
 
@@ -96,18 +103,14 @@ h_j1_x(j1_x);
 h_Hj_mass_j1_x(ang_Hj1.M,j1_x);
 h_j1_mass_j1_x(j1_mass,j1_x);
 
-
-
 h_H_pT_Hj_mass(higgs.Pt(),ang_Hj1.M);
 h_j1_pT_Hj_mass(jets[0].pt(),ang_Hj1.M);
 
 h_pp_pTrat_Hj_mass(particles[0].pt()/particles[1].pt(),ang_Hj1.M);
 h_pp_dphi_Hj_mass(std::abs(particles[0].delta_phi_to(particles[1])),ang_Hj1.M);
 
-
 if (jets.size() < 2) continue; // --------------------------------
 
 h_j2_pT(jets[1].pt());
-h_j2_mass(jets[1].m());
 
 #endif
