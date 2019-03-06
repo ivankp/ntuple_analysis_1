@@ -140,6 +140,13 @@ ivanp::binner<bin_t, std::tuple<ivanp::axis_spec<
     ra[#X2":"#X1"-"#X2"-"#X3], \
     ra[#X3":"#X1"-"#X2"-"#X3]);
 
+#define FILL_MACRO(_1,_2,_3,NAME,...) NAME
+#define FILL(...) FILL_MACRO(__VA_ARGS__, FILL3_, FILL2_, FILL1_)(__VA_ARGS__)
+
+#define FILL1_(X1) h_##X1(X1);
+#define FILL2_(X1,X2) h_##X1##_##X2(X1,X2);
+#define FILL3_(X1,X2,X3) h_##X1##_##X2##_##X3(X1,X2,X3);
+
 const double jet_pt_cut  = conf.at("/jets/cuts/pT"_jp);
 const double jet_eta_cut = conf.at("/jets/cuts/eta"_jp);
 const fj::JetDefinition jet_def = conf.at("/jets/alg"_jp);

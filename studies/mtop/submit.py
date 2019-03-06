@@ -11,7 +11,7 @@ def mkdirs(*ds):
 
 project_dir = '/home/ivanp/work/ntuple_analysis'
 loc = project_dir+'/studies/mtop'
-exe = loc + '/analysis'
+exe = loc + '/analysis2'
 
 jetR = float(sys.argv[1]) if len(sys.argv)>1 else 4
 njets = 2
@@ -74,7 +74,7 @@ CARD
     "alg": [ "antikt", jetR*0.1 ],
     "njets_min": 1
   },
-  'binning': loc+'/mtop.bins'
+  'binning': exe+'.bins'
   },
 'output': loc+'/out/'+chunk[0]+'.root'
 }, indent=2, separators=(',',': '))

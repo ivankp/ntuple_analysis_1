@@ -21,16 +21,19 @@ all: $(EXE)
 
 # -------------------------------------------------------------------
 C_analysis := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS) $(LDFLAGS)
-L_analysis := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS)
+L_analysis := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS) -lpcre
 
-BLD := ../../.build
+C_analysis2 := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS) $(LDFLAGS)
+L_analysis2 := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS) -lpcre
 
-analysis: \
-  $(BLD)/ivanp/program_options/program_options.o \
-  $(BLD)/ivanp/binner/re_axes.o \
-  $(BLD)/glob.o \
-  $(BLD)/Higgs2diphoton.o \
-  $(BLD)/reweighter.o
+VPATH := ../../.build
+
+analysis analysis2: \
+  ivanp/program_options/program_options.o \
+  ivanp/binner/re_axes.o \
+  glob.o \
+  Higgs2diphoton.o \
+  reweighter.o
 # -------------------------------------------------------------------
 
 $(DEPS): .%.d: %.cc

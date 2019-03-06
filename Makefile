@@ -89,7 +89,7 @@ bin/analyses/%: $(BLD)/analyses/%.o \
   $(BLD)/Higgs2diphoton.o \
   $(BLD)/reweighter.o
 	@mkdir -pv $(dir $@)
-	$(CXX) $(LDFLAGS) $(filter %.o,$^) -o $@ $(LDLIBS) $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS) -lboost_iostreams $(L_analyses/$*)
+	$(CXX) $(LDFLAGS) $(filter %.o,$^) -o $@ $(LDLIBS) $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS) -lboost_iostreams -lpcre $(L_analyses/$*)
 
 endif
 

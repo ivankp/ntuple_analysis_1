@@ -3,7 +3,7 @@
 dir=out
 
 for x in $(
-  find $dir -name '*.root' |
+  find $dir/ -name '*.root' |
   sed 's:.*/\(.*\)_[0-9]\+\.root$:\1:' |
   sort -u
 ); do
