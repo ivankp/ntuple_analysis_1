@@ -60,6 +60,10 @@ MAKE_ENUM(photon_cuts,(all)(with_photon_cuts))
 #define CATEGORIES (photon_cuts)(isp)
 #endif
 
+template <typename Cat>
+constexpr bool used_cat
+= ivanp::is_one_of<Cat,BOOST_PP_SEQ_ENUM(CATEGORIES)>::value;
+
 using nlo_bin_t = nlo_bin<double[]>;
 using bin_t = ivanp::category_bin<nlo_bin_t,BOOST_PP_SEQ_ENUM(CATEGORIES)>;
 template <bool... OF>
@@ -235,14 +239,14 @@ if (A1_pT < A2_pT) {
 // Photon cuts ------------------------------------------------------
 const double A1_eta = photons[0].Eta(), A2_eta = photons[1].Eta();
 
-bin_t::id<photon_cuts>(!(
+bin_t::id<photon_cuts>(used_cat<photon_cuts> ? !(
   (A1_pT < 0.35*125.) or
   (A2_pT < 0.25*125.) or
   photon_eta_cut(std::abs(A1_eta)) or
   photon_eta_cut(std::abs(A2_eta))
-));
+) : 0);
 
-bin_t::id<isp>((unsigned)get_isp(*_id1,*_id2));
+bin_t::id<isp>(used_cat<photon_cuts> ? (unsigned)get_isp(*_id1,*_id2) : 0);
 
 // Fill Histograms --------------------------------------------------
 SCOPE_EXIT { h_Njets.fill_bin(njets); };
