@@ -1,5 +1,6 @@
-/analysis
-/*.d
-/condor
-/out
-/junk
+/*
+Makefile
+!*.cc
+!*.py
+!*.sh
+!*.bins
