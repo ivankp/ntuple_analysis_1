@@ -246,7 +246,7 @@ bin_t::id<photon_cuts>(used_cat<photon_cuts> ? !(
   photon_eta_cut(std::abs(A2_eta))
 ) : 0);
 
-bin_t::id<isp>(used_cat<photon_cuts> ? (unsigned)get_isp(*_id1,*_id2) : 0);
+bin_t::id<isp>(used_cat<isp> ? (unsigned)get_isp(*_id1,*_id2) : 0);
 
 // Fill Histograms --------------------------------------------------
 SCOPE_EXIT { h_Njets.fill_bin(njets); };
