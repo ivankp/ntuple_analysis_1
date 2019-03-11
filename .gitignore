@@ -3,6 +3,7 @@
 !.gitignore
 !.gitmodules
 !Makefile
+!flags.mk
 !README*
 !include/
 !src/
