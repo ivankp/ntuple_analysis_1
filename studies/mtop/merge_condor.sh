@@ -9,6 +9,11 @@ for x in $(
 ); do
   echo $x
 
+  if [ -f "${x}.root" ]; then
+    echo "skipping"
+    continue
+  fi
+
   cat > .merge_${x}.sh << SCRIPT
 #!/bin/bash
 export PATH=${PATH}

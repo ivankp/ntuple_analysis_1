@@ -1,0 +1,20 @@
+{
+"input": [{
+  "info": "ntuples",
+  "files": [
+    "/msu/data/t3work4/luisonig/H3jets_ggf/NTuplesFiles/H3.0j_GGFHT_RS_6500_pt25.0_eta4.5_r100_232.root"
+  ],
+  "tree": "t3",
+  "weights": "weight2"
+}],
+"entry_range": [0,100],
+"analysis": {
+  "jets": {
+    "cuts": { "pT": 30, "eta": 4.4 },
+    "alg": [ "antikt", 0.4 ],
+    "njets_born": 3
+  },
+  "binning": "/home/ivanp/work/ntuple_analysis/cards/Hjets.bins"
+},
+"output": "/home/ivanp/work/ntuple_analysis/test.json.xz"
+}

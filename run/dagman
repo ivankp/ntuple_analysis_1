@@ -1,0 +1,8 @@
+JOB H1j_B ../analysis.condor
+VARS H1j_B match_cards="*_H1j_B_card.json"
+
+JOB H1j_B_merge merge.condor
+VARS H1j_B parts="*_H1j_B_hist.json"
+
+PARENT H1j_B CHILD H1j_B_merge
+
