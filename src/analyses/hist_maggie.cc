@@ -1,7 +1,5 @@
 #ifndef ANALYSIS
 
-#define OUTPUT_SCRIBE
-
 #define HIST_HJ "hist_maggie.cc"
 #include "hist_Hjets.hh"
 

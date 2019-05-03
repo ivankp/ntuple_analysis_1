@@ -25,7 +25,7 @@
 #include "glob.hh"
 
 #define TEST(var) \
-  std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;
+  std::cout << "\033[36m" #var "\033[0m = " << (var) << std::endl;
 
 // #define _STR(S) #S
 // #define STR(S) _STR(S)

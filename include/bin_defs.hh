@@ -4,9 +4,6 @@
 #include <vector>
 #include "ivanp/debug/at.hh"
 
-#define TEST(var) \
-  std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;
-
 struct lo_bin {
   double w = 0, w2 = 0;
   long unsigned n = 0;
@@ -68,7 +65,10 @@ struct nlo_bin<T,std::enable_if_t<std::is_arithmetic<T>::value>>
     n  += b.n;
     return *this;
   }
-  void finalize() noexcept { w2 += wtmp*wtmp; }
+  void finalize() noexcept {
+    w2 += wtmp*wtmp;
+    wtmp = 0;
+  }
 };
 
 template <typename T>
@@ -81,7 +81,7 @@ struct nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>
   std::vector<w_struct> ws;
   long unsigned n = 0;
   nlo_bin(): nlo_bin_base(), ws(weights.size()) { }
-  void operator()() noexcept {
+  void operator()() {
     if (id == current_id) {
       for (unsigned i=ws.size(); i; ) {
         --i;
@@ -103,7 +103,7 @@ struct nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>
     }
     ++n;
   }
-  nlo_bin& operator+=(const nlo_bin& b) noexcept {
+  nlo_bin& operator+=(const nlo_bin& b) {
     for (unsigned i=ws.size(); i; ) {
       --i;
       auto& _b = b.ws AT(i);
@@ -115,11 +115,16 @@ struct nlo_bin<T[],std::enable_if_t<std::is_arithmetic<T>::value>>
     n += b.n;
     return *this;
   }
-  void finalize() noexcept {
+
+  auto& operator*() { return ws[wi]; }
+  const auto& operator*() const { return ws[wi]; }
+
+  void finalize() {
     for (unsigned i=ws.size(); i; ) {
       --i;
       auto& _ = ws AT(i);
       _.w2 += _.wtmp*_.wtmp;
+      _.wtmp = 0;
     }
   }
 };

@@ -22,19 +22,13 @@
 #include "ivanp/scope.hh"
 #include "bin_defs.hh"
 
-#ifdef OUTPUT_SCRIBE
-#include <boost/iostreams/filtering_streambuf.hpp>
-#include <boost/iostreams/filter/lzma.hpp>
-#include "ivanp/scribe.hh"
-#include "ivanp/scribe/binner.hh"
-#elif defined OUTPUT_ROOT
 #include <TDirectory.h>
 #include <TH1.h>
 #include "ivanp/root/binner.hh"
 #include <boost/preprocessor/seq/reverse.hpp>
-#else
-#error "OUTPUT_ not defined"
-#endif
+
+#include "ivanp/sqlite.hh"
+#include <cstdio>
 
 #include "json/JetAlgorithm.hh"
 #include "Higgs2diphoton.hh"
@@ -70,7 +64,6 @@ template <bool... OF>
 using hist = ivanp::binner<bin_t,
   std::tuple<ivanp::axis_spec<typename re_axes::axis_type,OF,OF>...> >;
 
-#ifdef OUTPUT_ROOT
 void excl_labels(TH1* h, bool excl) {
   auto* ax = h->GetXaxis();
   for (int i=1, n=h->GetNbinsX(); i<=n; ++i)
@@ -79,13 +72,11 @@ void excl_labels(TH1* h, bool excl) {
 
 namespace ivanp { namespace root {
 template <> struct bin_converter<bin_t> {
-  const auto& get (const bin_t& b) const { return (*b).ws[nlo_bin_t::wi]; }
-  const auto& val (const bin_t& b) const noexcept { return get(b).w;  }
-  const auto& err2(const bin_t& b) const noexcept { return get(b).w2; }
-  const auto& num (const bin_t& b) const noexcept { return (*b).n;  }
+  auto val (const bin_t& b) const noexcept { return (**b).w; }
+  auto num (const bin_t& b) const noexcept { return b->n; }
+  auto err2(const bin_t& b) const noexcept { return (**b).w2+sq((**b).wtmp); }
 };
 }}
-#endif
 
 inline bool photon_eta_cut(double abs_eta) noexcept {
   return (1.37 < abs_eta && abs_eta < 1.52) || (2.37 < abs_eta);
@@ -270,7 +261,6 @@ cnt["norm"] = ncount_total;
 cout << "\033[36mPreparing output\033[0m" << endl;
 
 // ==================================================================
-const string& ofname = runcards["output"];
 
 #ifndef HIST_MAX_D
 #define HIST_MAX_D 1
@@ -279,108 +269,194 @@ const string& ofname = runcards["output"];
 auto h_Njets_incl = h_Njets;
 h_Njets_incl.integrate_left();
 
-#ifdef OUTPUT_SCRIBE // =============================================
+const string& ofname = runcards["output"];
+if (ivanp::ends_with(ofname,".root")) {
 
-ivanp::scribe::writer out;
+  // Open output root file for histograms
+  auto fout = std::make_unique<TFile>(ofname.c_str(),"recreate");
+  if (fout->IsZombie()) return 1;
+  TDirectory *dir = fout.get();
 
-out("Njets_excl",h_Njets);
-out("Njets_incl",h_Njets_incl);
-
-#define WITH_COMMAS(z, n, text) ,text
-#define SAVE_HISTS(z, n, text) \
-  out.add_type<hist<1 BOOST_PP_REPEAT(n,WITH_COMMAS,0)>>(); \
-  for (const auto& h : hist<1 BOOST_PP_REPEAT(n,WITH_COMMAS,0)>::all) \
-    out(h.name,*h);
-BOOST_PP_REPEAT(HIST_MAX_D,SAVE_HISTS,)
-
-out.add_type<ivanp::scribe::lin_axis>();
-out.add_type<ivanp::scribe::list_axis>();
-
-ivanp::scribe::add_bin_types<bin_t>(out,weights_names);
-
-out.add_info(info.dump());
-
-cout << "\033[36mWriting output\033[0m: " << ofname << std::flush;
-try { // write output file
-  std::ofstream file(ofname);
-  file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
-  if (ivanp::ends_with(ofname,".xz")) {
-    namespace bio = boost::iostreams;
-    bio::filtering_streambuf<bio::output> buf;
-    buf.push(bio::lzma_compressor(bio::lzma::best_compression));
-    buf.push(file);
-    std::ostream(&buf) << out;
-  } else file << out;
-} catch (const std::exception& e) {
-  cout << endl;
-  cerr << "\033[31mError writing file\033[0m \"" << ofname << "\": "
-       << e.what() << endl;
-  return 1;
-}
-cout << " \033[32;1m✔\033[0m" << endl;
-
-#elif defined OUTPUT_ROOT // ========================================
-
-// Open output root file for histograms
-auto fout = std::make_unique<TFile>(ofname.c_str(),"recreate");
-if (fout->IsZombie()) return 1;
-TDirectory *dir = fout.get();
-
-// write root historgrams
-nlo_bin_t::wi = 0;
-for (const auto& w : weights_names) {
-  dir = dir->mkdir(w.c_str());
-  cout << dir->GetName() << endl;
+  // write root historgrams
+  nlo_bin_t::wi = 0;
+  for (const auto& w : weights_names) {
+    dir = dir->mkdir(w.c_str());
+    cout << dir->GetName() << endl;
 
 #define CATEGORY_TOP(r, data, elem) \
   bin_t::id<elem>() = 0; \
   for (const char* dir_name : enum_traits<elem>::all_str()) { \
     dir = dir->mkdir(dir_name);
+    BOOST_PP_SEQ_FOR_EACH(CATEGORY_TOP,,CATEGORIES)
+#undef CATEGORY_TOP
 
-  BOOST_PP_SEQ_FOR_EACH(CATEGORY_TOP,,CATEGORIES)
+      dir->cd();
 
-    dir->cd();
+      using ivanp::root::to_root;
+      using ivanp::root::slice_to_root;
 
-    using ivanp::root::to_root;
-    using ivanp::root::slice_to_root;
+      auto* _h_Njets_excl = to_root(h_Njets,"Njets_excl");
+      excl_labels(_h_Njets_excl,true);
+      auto* _h_Njets_incl = to_root(h_Njets_incl,"Njets_incl");
+      _h_Njets_incl->SetEntries( _h_Njets_excl->GetEntries() );
+      excl_labels(_h_Njets_incl,false);
 
-    auto* _h_Njets_excl = to_root(h_Njets,"Njets_excl");
-    excl_labels(_h_Njets_excl,true);
-    auto* _h_Njets_incl = to_root(h_Njets_incl,"Njets_incl");
-    _h_Njets_incl->SetEntries( _h_Njets_excl->GetEntries() );
-    excl_labels(_h_Njets_incl,false);
-
-    for (auto& h : hist<1>::all) to_root(*h,h.name);
-    for (auto& h : hist<1,0>::all) {
-      const auto vars = ivanp::rsplit<1>(h.name,'-');
-      slice_to_root(*h,vars[0],vars[1]);
-    }
-    for (auto& h : hist<1,0,0>::all) {
-      const auto vars = ivanp::rsplit<2>(h.name,'-');
-      slice_to_root(*h,vars[0],vars[1],vars[2]);
-    }
+      for (auto& h : hist<1>::all) to_root(*h,h.name);
+      for (auto& h : hist<1,0>::all) {
+        const auto vars = ivanp::rsplit<1>(h.name,'-');
+        slice_to_root(*h,vars[0],vars[1]);
+      }
+      for (auto& h : hist<1,0,0>::all) {
+        const auto vars = ivanp::rsplit<2>(h.name,'-');
+        slice_to_root(*h,vars[0],vars[1],vars[2]);
+      }
 
 #define CATEGORY_BOT(r, data, elem) \
     dir = dir->GetMotherDir(); \
     ++bin_t::id<elem>(); \
   }
+    BOOST_PP_SEQ_FOR_EACH(CATEGORY_BOT,,BOOST_PP_SEQ_REVERSE(CATEGORIES))
+#undef CATEGORY_BOT
 
-  BOOST_PP_SEQ_FOR_EACH(CATEGORY_BOT,,BOOST_PP_SEQ_REVERSE(CATEGORIES))
+    dir = dir->GetMotherDir();
+    ++nlo_bin_t::wi;
+  }
 
-  dir = dir->GetMotherDir();
-  ++nlo_bin_t::wi;
+  fout->cd();
+  TH1D *h_N = new TH1D("N","N",1,0,1);
+  h_N->SetBinContent(1,ncount_total);
+  h_N->SetEntries(num_events);
+
+  fout->Write();
+
+} else if (ivanp::ends_with(ofname,".db")) {
+
+  std::remove(ofname.c_str());
+  ivanp::sqlite db(ofname);
+  db("PRAGMA page_size=4096")
+    ("PRAGMA cache_size=8000");
+
+  using axis_ptr = const typename hist<1>::axis_type<0>*;
+  auto axis_cmp = [](axis_ptr a, axis_ptr b) noexcept { return (*a) < (*b); };
+  std::set<axis_ptr,decltype(axis_cmp)> axes_set(axis_cmp);
+  std::map<axis_ptr,decltype(axes_set)::iterator> axes_map;
+  for (auto& h : hist<1>::all) {
+    const axis_ptr a = &h->axis();
+    axes_map.emplace(a,axes_set.emplace(a).first);
+  }
+  std::map<axis_ptr,int> axes_index;
+  for (const auto& a : axes_map)
+    axes_index.emplace(
+      a.first,
+      std::distance(axes_set.begin(),a.second) + 2
+    );
+
+  db("CREATE TABLE axis_dict(\n uniform INT,\n edges TEXT\n)");
+  { auto stmt = db.prepare("INSERT INTO axis_dict VALUES (?,?)");
+
+    auto write = [&](const auto& axis){
+      if (axis.is_uniform()) {
+        stmt.bind(1,1);
+        stmt.bind(2,nlohmann::json{axis.nbins(),axis.min(),axis.max()}.dump());
+      } else {
+        stmt.bind(1,0);
+        nlohmann::json edges;
+        auto nbins = axis.nbins();
+        for (decltype(nbins) i=0; i<nbins; ++i)
+          edges.push_back(axis.edge(i));
+        stmt.bind(2,edges.dump());
+      }
+
+      stmt.step();
+      stmt.reset();
+    };
+
+    db("BEGIN");
+    write(h_Njets.axis());
+    for (auto a : axes_set) write(*a);
+    db("END");
+  }
+
+#define LAMBDA(r, data, elem) ",\n " BOOST_PP_STRINGIZE(elem TEXT)
+
+  db("CREATE TABLE hist(\n weight TEXT"
+    BOOST_PP_SEQ_FOR_EACH(LAMBDA,,CATEGORIES)
+    ",\n var1 TEXT,\n _axis INT,\n _head TEXT,\n _data BLOB\n)");
+
+#undef LAMBDA
+#define LAMBDA(r, data, elem) ",?"
+
+{ auto stmt = db.prepare("INSERT INTO hist VALUES (?"
+    BOOST_PP_SEQ_FOR_EACH(LAMBDA,,CATEGORIES) ",?,?,?,?)");
+
+  static constexpr int n = BOOST_PP_SEQ_SIZE(CATEGORIES) + 2;
+  stmt.bind(n+2,"f8,f8,u4",-1,false); // data header
+
+  auto write = [&](const auto& h, const auto& name){
+    stmt.bind(n,name,-1,false); // variable name
+
+    const auto& hbins = h.bins();
+    const unsigned nbins = hbins.size();
+
+    size_t data_len = nbins*(
+      sizeof(double)+sizeof(double)+sizeof(uint32_t)
+    );
+    void* data = malloc(data_len);
+    auto push = [p=data](auto x) mutable {
+      (*(reinterpret_cast<decltype(x)*&>(p)++)) = x;
+    };
+    for (unsigned i=0; i<nbins; ++i) {
+      const auto& b = *hbins[i];
+      const auto& w = *b;
+      push(w.w);
+      push(w.w2);
+      push((uint32_t)b.n);
+    }
+
+    stmt.bind(n+3,data,data_len);
+    free(data);
+
+    stmt.step();
+    stmt.reset();
+  };
+
+  db("BEGIN");
+
+#undef LAMBDA
+
+  nlo_bin_t::wi = 0;
+  for (const auto& col : weights_names) {
+    stmt.bind(1,col,-1,false);
+
+#define CATEGORY_TOP(r, data, I, elem) \
+  bin_t::id<elem>() = 0; \
+  for (const char* col : enum_traits<elem>::all_str()) { \
+    stmt.bind(I+2,col,-1,false);
+    BOOST_PP_SEQ_FOR_EACH_I(CATEGORY_TOP,,CATEGORIES)
+#undef CATEGORY_TOP
+
+      stmt.bind(n+1,1); // axis
+      write(h_Njets,"Njets_excl");
+      write(h_Njets_incl,"Njets_incl");
+
+      for (auto& h : hist<1>::all) {
+        stmt.bind(n+1,axes_index[&h->axis()]); // axis
+        write(*h,h.name);
+      }
+
+#define CATEGORY_BOT(r, data, elem) \
+    ++bin_t::id<elem>(); \
+  }
+    BOOST_PP_SEQ_FOR_EACH(CATEGORY_BOT,,BOOST_PP_SEQ_REVERSE(CATEGORIES))
+#undef CATEGORY_BOT
+
+    ++nlo_bin_t::wi;
+  }
+
+  db("END");
 }
 
-fout->cd();
-TH1D *h_N = new TH1D("N","N",1,0,1);
-h_N->SetBinContent(1,ncount_total);
-h_N->SetEntries(num_events);
-
-fout->Write();
-
-#else
-#error "OUTPUT_ not defined"
-#endif // FORMAT
+}
 
 #endif // ANALYSIS
 

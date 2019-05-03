@@ -44,6 +44,8 @@ L_merge_root := $(ROOT_LDLIBS)
 C_check_tree := $(ROOT_CXXFLAGS)
 L_check_tree := $(ROOT_LDLIBS) -lTreePlayer
 
+L_merge_sql := -lsqlite3
+
 bin/merge bin/merge_json: \
   $(BLD)/ivanp/program_options/program_options.o
 
@@ -85,11 +87,10 @@ bin/analyses/%: $(BLD)/analyses/%.o \
   $(BLD)/ivanp/binner/re_axes.o \
   $(BLD)/glob.o \
   $(BLD)/ivanp/io/mem_file.o \
-  $(BLD)/ivanp/scribe.o \
   $(BLD)/Higgs2diphoton.o \
   $(BLD)/reweighter.o
 	@mkdir -pv $(dir $@)
-	$(CXX) $(LDFLAGS) $(filter %.o,$^) -o $@ $(LDLIBS) $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS) -lboost_iostreams -lpcre $(L_analyses/$*)
+	$(CXX) $(LDFLAGS) $(filter %.o,$^) -o $@ $(LDLIBS) $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS) -lboost_iostreams -lpcre -lsqlite3 $(L_analyses/$*)
 
 endif
 
