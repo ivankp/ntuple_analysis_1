@@ -12,10 +12,18 @@
 
 #include "ivanp/sqlite.hh"
 #include "ivanp/program_options.hh"
+#include "ivanp/string.hh"
 
 using std::cout;
 using std::endl;
 using std::cerr;
+using std::get;
+using ivanp::cat;
+
+template <typename C, typename T>
+bool has(const C& cont, T&& x) {
+  return std::find_if(cont.begin(),cont.end(),std::forward<T>(x))!=cont.end();
+}
 
 #define CAST(T,X) reinterpret_cast<T*&>(X)
 #define ADDER_FCN(S,T) \
@@ -86,8 +94,6 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  std::map<std::string,long unsigned int> counts;
-
   std::vector<std::array<std::string,2>> cols;
   std::vector<std::set<ivanp::sqlite::value>> values;
 
@@ -109,6 +115,16 @@ int main(int argc, char* argv[]) {
   unsigned ncols=0, ndata=0;
   int i_head=-1, i_data=-1;
 
+  std::map<std::string,long unsigned int> counts;
+
+  std::map<
+    std::string,
+    std::vector<std::tuple<
+      std::array<std::string,2>,
+      std::vector<ivanp::sqlite::value>
+    >>
+  > dicts;
+
   for (unsigned f=0; f<ifnames.size(); ++f) {
     if (verbose) cout << '\n';
     cout << ifnames[f] << endl;
@@ -116,6 +132,7 @@ int main(int argc, char* argv[]) {
 
     // TODO: compare axis definitions
 
+    // read counts ==================================================
     { auto stmt = db.prepare("SELECT * from num");
       while (stmt.step()) {
         const std::string name = stmt.column_text(0);
@@ -171,6 +188,35 @@ int main(int argc, char* argv[]) {
                  << endl;
             return 1;
           }
+        }
+      }
+    }
+
+    // read dictionaries ============================================
+    { auto stmt = db.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table'");
+      while (stmt.step()) {
+        const std::string name = stmt.column_text(0);
+        if (!(ivanp::ends_with(name,"_dict") &&
+            has(cols,[
+              col_name=("_"+name.substr(0,name.size()-5))
+            ](const auto& col){ return col[0] == col_name; })
+        )) continue;
+        auto& dict0 = dicts[name];
+        decltype(dicts)::mapped_type dict;
+        for (auto stmt = db.prepare(cat("PRAGMA table_info(",name,")"));
+             stmt.step(); )
+        {
+          dict.emplace_back();
+          auto& col = get<0>(dict.back());
+          col = { stmt.column_text(1), stmt.column_text(2) };
+        }
+        if (!f) {
+          dict0 = std::move(dict);
+        } else if (dict != dict0) {
+          cerr << "\033[31m" "unequal dictionaries \"" << name << "\""
+                  "\033[0m" << endl;
+          return 1;
         }
       }
     }
@@ -268,12 +314,28 @@ int main(int argc, char* argv[]) {
   ivanp::sqlite db(ofname);
   db("PRAGMA page_size=4096")("PRAGMA cache_size=8000");
 
+  // write counts ---------------------------------------------------
   db("CREATE TABLE num(value TEXT, n INT)");
   { auto stmt = db.prepare("INSERT INTO num VALUES (?,?)");
     for (const auto& x : counts)
       stmt.bind_row(x.first,x.second);
   }
 
+  // write dictionaries ---------------------------------------------
+  for (const auto& dict : dicts) {
+    std::stringstream sql;
+    sql << "CREATE TABLE " << dict.first << '(';
+    bool first = true;
+    for (const auto& col : dict.second) {
+      if (first) first = false;
+      else sql << ", ";
+      sql << get<0>(col)[0] <<' '<< get<0>(col)[1];
+    }
+    sql << ')';
+    db(sql.str());
+  }
+
+  // write histograms -----------------------------------------------
   { std::stringstream sql;
     sql << "CREATE TABLE hist(";
     for (unsigned i=0; i<ncols; ++i) {
