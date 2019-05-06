@@ -211,6 +211,10 @@ int main(int argc, char* argv[]) {
           auto& col = get<0>(dict.back());
           col = { stmt.column_text(1), stmt.column_text(2) };
         }
+        unsigned ncols = dict.size();
+        for (auto stmt = db.prepare(cat("SELECT * from ",name)); stmt.step();)
+          for (unsigned i=0; i<ncols; ++i)
+            get<1>(dict[i]).emplace_back(stmt.column_value(i));
         if (!f) {
           dict0 = std::move(dict);
         } else if (dict != dict0) {
@@ -323,16 +327,36 @@ int main(int argc, char* argv[]) {
 
   // write dictionaries ---------------------------------------------
   for (const auto& dict : dicts) {
-    std::stringstream sql;
-    sql << "CREATE TABLE " << dict.first << '(';
-    bool first = true;
-    for (const auto& col : dict.second) {
-      if (first) first = false;
-      else sql << ", ";
-      sql << get<0>(col)[0] <<' '<< get<0>(col)[1];
+    std::stringstream create;
+    create << "CREATE TABLE " << dict.first << '(';
+    const unsigned ncols = dict.second.size();
+    for (unsigned i=0; i<ncols; ++i) {
+      if (i) create << ", ";
+      const auto& col = get<0>(dict.second[i]);
+      create << col[0] <<' '<< col[1];
     }
-    sql << ')';
-    db(sql.str());
+    create << ')';
+    db(create.str());
+
+    std::stringstream insert;
+    insert << "INSERT INTO " << dict.first << " VALUES (";
+    for (unsigned i=0; i<ncols; ++i) {
+      if (i) insert << ',';
+      insert << '?';
+    }
+    insert << ')';
+    auto stmt = db.prepare(insert.str());
+    db("BEGIN");
+    auto col = [&](unsigned i) -> const auto& {
+      return get<1>(dict.second[i]);
+    };
+    for (size_t r=0, nr=col(0).size(); r<nr; ++r) {
+      for (unsigned i=0; i<ncols; ++i)
+        stmt.bind(i+1, col(i)[r]);
+      stmt.step();
+      stmt.reset();
+    }
+    db("END");
   }
 
   // write histograms -----------------------------------------------
