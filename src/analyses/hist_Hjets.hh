@@ -336,6 +336,19 @@ if (ivanp::ends_with(ofname,".root")) {
   db("PRAGMA page_size=4096")
     ("PRAGMA cache_size=8000");
 
+  db("CREATE TABLE runcard(runcard TEXT)");
+  { auto stmt = db.prepare("INSERT INTO runcard VALUES (?)");
+    stmt.bind_row(runcards.dump());
+  }
+
+  db("CREATE TABLE num(value TEXT, n INT)");
+  { auto stmt = db.prepare("INSERT INTO num VALUES (?,?)");
+    stmt.bind_row("entries",num_entries)
+        .bind_row("events",num_events)
+        .bind_row("ncount",ncount_total)
+        .bind_row("norm",ncount_total);
+  }
+
   using axis_ptr = const typename hist<1>::axis_type<0>*;
   auto axis_cmp = [](axis_ptr a, axis_ptr b) noexcept { return (*a) < (*b); };
   std::set<axis_ptr,decltype(axis_cmp)> axes_set(axis_cmp);
@@ -351,7 +364,7 @@ if (ivanp::ends_with(ofname,".root")) {
       std::distance(axes_set.begin(),a.second) + 2
     );
 
-  db("CREATE TABLE axis_dict(\n uniform INT,\n edges TEXT\n)");
+  db("CREATE TABLE axis_dict(uniform INT, edges TEXT)");
   { auto stmt = db.prepare("INSERT INTO axis_dict VALUES (?,?)");
 
     auto write = [&](const auto& axis){
