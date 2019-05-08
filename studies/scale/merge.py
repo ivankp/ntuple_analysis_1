@@ -56,3 +56,8 @@ for (g,fs) in nlo.items():
             os.system(merger+' -x -o '+ofname+' '+
                 ' '.join('merged/'+f[1] for f in fs))
 
+ofname = 'merged/all.db'
+print '\n', ofname
+if args.f or not os.path.isfile(ofname):
+    os.system('./join.py '+ofname+' merged/*.db')
+

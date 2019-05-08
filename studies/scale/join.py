@@ -38,9 +38,10 @@ for cur in curs:
                 print "all input databases must have the same tables"
                 sys.exit(1)
 tabs = [ t[0] for t in tabs ]
+tabs.remove('hist')
+print tabs
 
 for tab in tabs:
-    if tab=='hist': continue
     for rows in zip(cur.execute('SELECT * FROM '+tab) for cur in curs):
         x = None
         for row in rows:
@@ -58,25 +59,28 @@ for cur in curs:
         sys.exit(1)
 print cols
 
-def test(s):
-    print s
-    return s
+if os.path.isfile(sys.argv[1]):
+    os.remove(sys.argv[1])
 
 out_db = sqlite3.connect(sys.argv[1])
 out_cur = out_db.cursor()
+def exe(sql):
+    print sql
+    out_cur.execute(sql)
+
 for i,f in enumerate(fnames):
-    out_cur.execute(test('ATTACH DATABASE "{}" AS db{}'.format(f,i)))
-out_cur.execute(test(
-    'CREATE TABLE hist(' +
+    exe('ATTACH DATABASE "{}" AS db{}'.format(f,i))
+    if i==0:
+        for tab in tabs:
+            exe('CREATE TABLE {0} AS SELECT * FROM db0.{0}'.format(tab))
+        out_db.commit()
+exe('CREATE TABLE hist(' +
     ','.join('\n tag{} TEXT'.format(i) for i in xrange(ntags)) +
     ',' +
     ','.join('\n {} {}'.format(*col) for col in cols) +
-    '\n)'
-))
+    '\n)')
 for i,f in enumerate(fnames):
-    out_cur.execute(test(
-        'INSERT INTO hist SELECT {}, * FROM db{}.hist'.format(
-        ', '.join('"{}"'.format(tag) for tag in tags[i]), i)
-    ))
+    exe('INSERT INTO hist SELECT {}, * FROM db{}.hist'.format(
+        ', '.join('"{}"'.format(tag) for tag in tags[i]), i))
     out_db.commit()
 
