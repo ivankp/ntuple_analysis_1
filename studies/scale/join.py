@@ -1,17 +1,32 @@
 #!/usr/bin/env python
 
-import sys, os, re, sqlite3
+import argparse, sys, os, re, sqlite3
 
-if len(sys.argv)<3:
-    print "usage:", sys.argv[0], "out.db in1.db [in2.db ...]"
+parser = argparse.ArgumentParser()
+parser.add_argument('-i', dest='ifnames', nargs='+', required=True,
+    help='input files')
+parser.add_argument('-o', dest='ofname', required=True,
+    help='output file')
+parser.add_argument('-t', dest='tags', nargs='+', required=True,
+    help='regex for tokenizing input file names')
+args = parser.parse_args()
 
-fnames = sys.argv[2:]
-curs = [ sqlite3.connect(x).cursor() for x in fnames ]
+tags_names = args.tags[1:]
+ntags = len(tags_names)
+tags_re = re.compile(args.tags[0])
 
-tags = [ f[f.rfind('/')+1:].rstrip('.db').split('_') for f in fnames ]
-ntags = len(tags[0])
-if not all(len(x)==ntags for x in tags):
-    print "file names must split into equal numbers of tags"
+tags = [ ]
+for f in args.ifnames:
+    m = tags_re.match(f)
+    if not m:
+        print "input file names must match tags expression"
+        sys.exit(1)
+    m = list(m.groups())
+    print m
+    if len(m)!=ntags:
+        print "number of match groups must equal the number of tag names"
+        sys.exit(1)
+    tags.append(m)
 
 def all_same(xs, f=lambda x: x):
     x0 = None
@@ -20,12 +35,14 @@ def all_same(xs, f=lambda x: x):
         elif f(x) != x0: return False
     return True
 
-# print tags
-for i in filter(lambda i: all_same(t[i] for t in tags), xrange(ntags)):
-    for t in tags:
-        t.pop(i)
+tagi = filter(lambda i: not all_same(t[i] for t in tags), xrange(ntags))
+tags = [ [ t[i] for i in tagi ] for t in tags ]
+tags_names = [ tags_names[i] for i in tagi ]
+ntags = len(tags_names)
+print tags_names
 print tags
-ntags = len(tags[0])
+
+curs = [ sqlite3.connect(x).cursor() for x in args.ifnames ]
 
 tabs = None
 for cur in curs:
@@ -59,28 +76,29 @@ for cur in curs:
         sys.exit(1)
 print cols
 
-if os.path.isfile(sys.argv[1]):
-    os.remove(sys.argv[1])
+print args.ofname
+if os.path.isfile(args.ofname):
+    os.remove(args.ofname)
 
-out_db = sqlite3.connect(sys.argv[1])
+out_db = sqlite3.connect(args.ofname)
 out_cur = out_db.cursor()
 def exe(sql):
     print sql
     out_cur.execute(sql)
 
-for i,f in enumerate(fnames):
+for i,f in enumerate(args.ifnames):
     exe('ATTACH DATABASE "{}" AS db{}'.format(f,i))
     if i==0:
         for tab in tabs:
             exe('CREATE TABLE {0} AS SELECT * FROM db0.{0}'.format(tab))
+        exe('CREATE TABLE hist(' +
+            ','.join('\n {} TEXT'.format(tag) for tag in tags_names) +
+            ',' +
+            ','.join('\n {} {}'.format(*col) for col in cols) +
+            '\n)')
         out_db.commit()
-exe('CREATE TABLE hist(' +
-    ','.join('\n tag{} TEXT'.format(i) for i in xrange(ntags)) +
-    ',' +
-    ','.join('\n {} {}'.format(*col) for col in cols) +
-    '\n)')
-for i,f in enumerate(fnames):
     exe('INSERT INTO hist SELECT {}, * FROM db{}.hist'.format(
         ', '.join('"{}"'.format(tag) for tag in tags[i]), i))
     out_db.commit()
+    exe('DETACH DATABASE db{}'.format(i))
 

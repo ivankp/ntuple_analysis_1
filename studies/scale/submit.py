@@ -16,8 +16,11 @@ project_dir = loc
 while os.path.basename(project_dir) != 'ntuple_analysis':
     project_dir = os.path.dirname(project_dir)
 
+if len(sys.argv) < 2:
+    print "usage:", sys.argv[0], "njets"
+    sys.exit()
+njets = int(sys.argv[1])
 jetR = 4
-njets = 1
 
 chunk_size = 20e6
 
@@ -34,8 +37,8 @@ def get(info):
     cur.execute('''
 SELECT dir,file,particle,njets,part,info,nentries
 FROM ntuples
-WHERE info="{}" and njets=1 and particle="H" and energy=13 and part="{}"
-'''.format(*info))
+WHERE info="{1}" and njets={0} and particle="H" and energy=13 and part="{2}"
+'''.format(njets,*info))
     fs = [ ( x[-1], x[0]+'/'+x[1], '{}{}j{}_{}_antikt{:g}'.format(
         x[2], x[3], x[4], ('mtop' if ('mtop' in x[5]) else 'eft'), jetR
     )) for x in cur.fetchall() ]
@@ -77,7 +80,7 @@ CARD
             'jets': {
                 "cuts": { "pT": 30, "eta": 4.4 },
                 "alg": [ "antikt", jetR*0.1 ],
-                "njets_min": 1
+                "njets_min": njets
             },
             'binning': loc+'/analysis.bins'
         },

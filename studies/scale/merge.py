@@ -59,5 +59,8 @@ for (g,fs) in nlo.items():
 ofname = 'merged/all.db'
 print '\n', ofname
 if args.f or not os.path.isfile(ofname):
-    os.system('./join.py '+ofname+' merged/*.db')
+    os.system(
+        './join.py -o '+ofname+' -i merged/*.db -t ' +
+        r"'.*/([^\d]+)(\d+)j([^_]+)_([^_]+)_([^_.]+).*'" +
+        ' particle njets part coupling jet_def')
 
