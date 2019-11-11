@@ -40,8 +40,7 @@ auto h_Hjs_mass = h_reserve(njets_min+1,
 
 #elif defined(ANALYSIS_LOOP) // =====================================
 
-if (njets < njets_min) continue;
-const unsigned max_njets = std::min(njets,njets_min+1);
+// if (njets < njets_min) continue;
 
 const double H_pT   = higgs.Pt();
 const double H_y    = higgs.Rapidity();
@@ -54,8 +53,32 @@ h_H_mass(H_mass);
 h_H_mass_hgam(H_mass);
 
 double HT = H_pT;
-double jets_tau_max = 0, jets_tau_sum = 0;
 auto Hjs = higgs;
+
+h_A_pT [0](A1_pT ); h_A_pT [1](A2_pT );
+h_A_eta[0](A1_eta); h_A_eta[1](A2_eta);
+for (unsigned i=0; i<2; ++i) {
+  h_A_y  [i](photons[i].Rapidity());
+  h_A_phi[i](photons[i].Phi());
+}
+
+// cos θ* in Collins-Soper frame
+h_AA_cosTS_CSframe(
+  std::sinh(std::abs(A1_eta-A2_eta)) * A1_pT * A2_pT * 2
+  / ( std::sqrt(1.+sq(H_pT/H_mass)) * sq(H_mass) ) );
+
+// cos θ* in Higgs rest frame
+const auto Hframe_boost = -higgs.BoostVector();
+auto A1_Hframe = photons[0];
+A1_Hframe.Boost(Hframe_boost);
+h_AA_cosTS_Hframe( std::abs(A1_Hframe.CosTheta()) );
+
+h_AA_pTt(pTt(photons[0],photons[1]));
+
+if (njets < 1) continue;
+const unsigned max_njets = std::min(njets,njets_min+1);
+
+double jets_tau_max = 0, jets_tau_sum = 0;
 
 for (unsigned j=0; j<max_njets; ++j) {
   const auto jet_pT = jets[j].pt();
@@ -79,26 +102,6 @@ h_HT(HT);
 
 h_jets_tau_max(jets_tau_max);
 h_jets_tau_sum(jets_tau_sum);
-
-h_A_pT [0](A1_pT ); h_A_pT [1](A2_pT );
-h_A_eta[0](A1_eta); h_A_eta[1](A2_eta);
-for (unsigned i=0; i<2; ++i) {
-  h_A_y  [i](photons[i].Rapidity());
-  h_A_phi[i](photons[i].Phi());
-}
-
-// cos θ* in Collins-Soper frame
-h_AA_cosTS_CSframe(
-  std::sinh(std::abs(A1_eta-A2_eta)) * A1_pT * A2_pT * 2
-  / ( std::sqrt(1.+sq(H_pT/H_mass)) * sq(H_mass) ) );
-
-// cos θ* in Higgs rest frame
-const auto Hframe_boost = -higgs.BoostVector();
-auto A1_Hframe = photons[0];
-A1_Hframe.Boost(Hframe_boost);
-h_AA_cosTS_Hframe( std::abs(A1_Hframe.CosTheta()) );
-
-h_AA_pTt(pTt(photons[0],photons[1]));
 
 #endif
 

@@ -68,7 +68,7 @@ std::sort( particles.begin(), particles.end(),
 const auto H_y = higgs.Rapidity();
 bin_t::id<H_rapidity_cut>( std::abs(H_y) < 0.1 );
 
-const auto j1_nsub = jets[0].constituents().size();
+const auto j1_nsub = jets.size() ? jets[0].constituents().size() : 0;
 bin_t::id<fat_jet>(j1_nsub);
 
 if (particles.size()>=1)
@@ -79,9 +79,12 @@ if (particles.size()>=2)
 // ==================================================================
 
 h_H_pT(higgs.Pt());
-h_j1_pT(jets[0].pt());
 
 h_H_y(H_y);
+
+if (jets.size() < 1) continue; // -----------------------------------
+
+h_j1_pT(jets[0].pt());
 
 const auto ang_Hj1 = ang(higgs,
   { jets[0][0], jets[0][1], jets[0][2], jets[0][3] }
@@ -109,7 +112,7 @@ h_j1_pT_Hj_mass(jets[0].pt(),ang_Hj1.M);
 h_pp_pTrat_Hj_mass(particles[0].pt()/particles[1].pt(),ang_Hj1.M);
 h_pp_dphi_Hj_mass(std::abs(particles[0].delta_phi_to(particles[1])),ang_Hj1.M);
 
-if (jets.size() < 2) continue; // --------------------------------
+if (jets.size() < 2) continue; // -----------------------------------
 
 h_j2_pT(jets[1].pt());
 

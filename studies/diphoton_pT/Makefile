@@ -21,10 +21,8 @@ all: $(EXE)
 
 # -------------------------------------------------------------------
 C_analysis := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS) $(LDFLAGS)
-L_analysis := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS) -lpcre -lsqlite3
-
-C_analysis2 := $(ROOT_CXXFLAGS) $(FJ_CXXFLAGS) $(LDFLAGS)
-L_analysis2 := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS) -lpcre -lsqlite3
+L_analysis := $(ROOT_LDLIBS) -lTreePlayer $(FJ_LDLIBS) $(LHAPDF_LDLIBS) \
+  -lpcre -lsqlite3
 
 VPATH := ../../.build
 

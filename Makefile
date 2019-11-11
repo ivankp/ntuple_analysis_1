@@ -46,8 +46,15 @@ L_check_tree := $(ROOT_LDLIBS) -lTreePlayer
 
 L_merge_sql := -lsqlite3
 
+C_root2sql := $(ROOT_CXXFLAGS)
+L_root2sql := $(ROOT_LDLIBS) -lsqlite3
+
 bin/merge bin/merge_json bin/merge_sql: \
   $(BLD)/ivanp/program_options/program_options.o
+
+bin/root2sql: \
+  $(BLD)/ivanp/program_options/program_options.o \
+  $(BLD)/ivanp/io/mem_file.o
 
 bin/merge: \
   $(BLD)/ivanp/io/mem_file.o \

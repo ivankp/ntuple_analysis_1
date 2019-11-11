@@ -12,8 +12,6 @@
 
 #elif defined(ANALYSIS_LOOP) // =====================================
 
-if (njets < njets_min) continue;
-
 // const double H_pT = higgs.Pt();
 // h_H_pT(H_pT);
 
@@ -25,6 +23,8 @@ if (njets < njets_min) continue;
 // h_H_eta(higgs.Eta());
 // h_H_phi(higgs.Phi());
 // h_H_mass(higgs.M());
+
+// if (njets < 1) continue;
 
 #elif defined(ANALYSIS_END) // ======================================
 

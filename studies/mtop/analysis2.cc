@@ -37,7 +37,7 @@ std::sort( particles.begin(), particles.end(),
     return ( a.pt() > b.pt() );
   });
 
-const auto j1_nsub = jets[0].constituents().size();
+const auto j1_nsub = jets.size() ? jets[0].constituents().size() : 0;
 bin_t::id<fat_jet>(j1_nsub);
 
 if (particles.size()>=1)
@@ -46,17 +46,20 @@ if (particles.size()>=2)
   bin_t::id<p2_flavor>(_kf[particles[1].user_index()]==21 ? 1 : 2 );
 
 // ==================================================================
+const double H_pT = higgs.Pt();
+
+FILL(H_pT)
+
+if (jets.size() < 1) continue; // --------------------------------
 
 FILL(j1_nsub)
 
 const auto Hj = higgs + jets[0];
 
 const double
-  H_pT = higgs.Pt(),
   j1_pT = jets[0].pt(),
   Hj_mass = Hj.M();
 
-FILL(H_pT)
 FILL(j1_pT)
 FILL(H_pT,j1_pT)
 

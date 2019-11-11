@@ -36,7 +36,7 @@ h_(AA_dphi)
 
 #elif defined(ANALYSIS_LOOP) // =====================================
 
-if (njets < njets_min) continue;
+// if (njets < njets_min) continue;
 // const unsigned max_njets = std::min(njets,njets_min+1);
 
 const double H_mass = higgs.M();
@@ -63,6 +63,8 @@ const double H_pT  = higgs.Pt();
 const double H_y   = higgs.Rapidity();
 const double H_eta = higgs.Eta();
 const double H_phi = higgs.Phi();
+
+// if (njets < 1) continue;
 
 const auto jet_vars = jets | [](const auto& jet){
   struct vars { double pT, y, eta, phi; };
