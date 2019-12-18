@@ -3,6 +3,6 @@
 ../../bin/root2sql \
   -i merged/*.root \
   -o cp_threshold.db \
-  -l proc type jet weight photon_cuts isp \
+  -l proc type diag jet weight isp photon_cuts T24_sqrtS \
      var1 var2
 

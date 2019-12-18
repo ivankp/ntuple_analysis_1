@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, os, sqlite3, json
+import sys, os, sqlite3, json, re
 from subprocess import Popen, PIPE
 from collections import defaultdict
 
@@ -33,15 +33,23 @@ LD_LIBRARY_PATH = os.environ['LD_LIBRARY_PATH']
 
 subcount = defaultdict(lambda:0)
 
+def diagram(info):
+    for m in re.finditer(' (tr|bx|pn)(?: |$)',info):
+        return m.group(1)
+    return 'all'
+
 def get(info):
     cur.execute('''
 SELECT dir,file,particle,njets,part,info,nentries
 FROM ntuples
-WHERE info="{1}" and njets={0} and (particle="H" or particle="AA")
-and energy=13 and part="{2}"
-'''.format(njets,*info))
-    fs = [ ( x[-1], x[0]+'/'+x[1], '{}{}j{}_{}_antikt{:g}'.format(
-        x[2], x[3], x[4], ('mtop' if ('mtop' in x[5]) else 'eft'), jetR
+WHERE njets=? and info=? and part=?
+and (particle="H" or particle="AA") and energy=13
+''',(njets,info[0],info[1]))
+    fs = [ ( x[-1], x[0]+'/'+x[1], '{}{}j{}_{}_{}_antikt{:g}'.format(
+        x[2], x[3], x[4],
+        ('mtop' if ('mtop' in x[5]) else 'eft'),
+        diagram(x[5]),
+        jetR
     )) for x in cur.fetchall() ]
     pref = set([x[2] for x in fs])
     if len(pref) > 1:
@@ -111,13 +119,19 @@ for part in ('B'):
     for job in jobs(
         # ('GGFHT pt25.0 eta4.5',part),
         # ('mtop GGFHT pt25.0 eta4.5',part),
+
         ('Nico',part),
         ('ED GGFHT pt25.0 eta4.5',part),
         ('mtop GGFHT pt25.0 eta4.5',part),
-        ('mtop amegic_GGFHT pt25.0 eta4.5',part)
+        ('mtop amegic_GGFHT pt25.0 eta4.5',part),
+
+        ('amegic_GGFHT pt25.0 eta4.5 mtop tr',part),
+        ('amegic_GGFHT pt25.0 eta4.5 mtop bx',part),
+        ('amegic_GGFHT pt25.0 eta4.5 mtop pn',part)
     ):
         p = Popen(('condor_submit','-'), stdin=PIPE, stdout=PIPE)
         p.stdin.write(job)
         p.communicate()
         p.stdin.close()
+        # pass
 

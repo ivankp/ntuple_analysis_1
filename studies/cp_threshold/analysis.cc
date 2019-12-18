@@ -7,7 +7,9 @@
 
 #elif defined(ANALYSIS_GLOBAL) // ===================================
 
-// #define CATEGORIES (photon_cuts)
+MAKE_ENUM(T24_sqrtS,(all)(T24_small)(T24_large))
+
+#define CATEGORIES (isp)(photon_cuts)(T24_sqrtS)
 
 TLorentzVector operator>>(TLorentzVector v, const TVector3& b) {
   v.Boost(b);
@@ -37,8 +39,6 @@ const double Hj1_mass = (higgs + jets[0]).M();
 const double
   j2_pT = jets[1].pt();
 
-FILL(Hj1_mass,j2_pT)
-
 // B ----------------------------------------------------------------
 const auto cm_boost = -(higgs + jets[0] + jets[1]).BoostVector();
 
@@ -63,6 +63,10 @@ const auto& p1 = (i1_closer_to_4 ? cm_i2 : cm_i1);
 const double T24   = std::sqrt(std::abs((p2-p4).M2()));
 const double sqrtS = std::sqrt(std::abs((pH+p3).M2()));
 const double Q     = std::sqrt(std::abs((p1-pH).M2()));
+
+bin_t::id<T24_sqrtS>( T24 < sqrtS ? 1 : 2 );
+
+FILL(Hj1_mass,j2_pT)
 
 FILL(sqrtS,T24)
 FILL(Q,T24)
