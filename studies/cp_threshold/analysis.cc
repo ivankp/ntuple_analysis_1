@@ -8,8 +8,9 @@
 #elif defined(ANALYSIS_GLOBAL) // ===================================
 
 MAKE_ENUM(T24_sqrtS,(all)(T24_small)(T24_large))
+MAKE_ENUM(swap_34,(all)(no)(yes))
 
-#define CATEGORIES (isp)(photon_cuts)(T24_sqrtS)
+#define CATEGORIES (isp)(photon_cuts)(swap_34)(T24_sqrtS)
 
 TLorentzVector operator>>(TLorentzVector v, const TVector3& b) {
   v.Boost(b);
@@ -51,24 +52,28 @@ const auto cm_higgs = higgs >> cm_boost;
 const auto cm_jet1 = jets[0] >> cm_boost;
 const auto cm_jet2 = jets[1] >> cm_boost;
 
-const auto& p4 = cm_jet2;
-const auto& p3 = cm_jet1;
 const auto& pH = cm_higgs;
+for (bool swap34 : {false,true}) {
+  bin_t::id<swap_34>( swap34 ? 2 : 1 );
 
-const bool i1_closer_to_4 = angle(p4,cm_i1) < angle(p4,cm_i2);
+  const auto& p4 = swap34 ? cm_jet1 : cm_jet2;
+  const auto& p3 = swap34 ? cm_jet2 : cm_jet1;
 
-const auto& p2 = (i1_closer_to_4 ? cm_i1 : cm_i2);
-const auto& p1 = (i1_closer_to_4 ? cm_i2 : cm_i1);
+  const bool i1_closer_to_4 = angle(p4,cm_i1) < angle(p4,cm_i2);
 
-const double T24   = std::sqrt(std::abs((p2-p4).M2()));
-const double sqrtS = std::sqrt(std::abs((pH+p3).M2()));
-const double Q     = std::sqrt(std::abs((p1-pH).M2()));
+  const auto& p2 = (i1_closer_to_4 ? cm_i1 : cm_i2);
+  const auto& p1 = (i1_closer_to_4 ? cm_i2 : cm_i1);
 
-bin_t::id<T24_sqrtS>( T24 < sqrtS ? 1 : 2 );
+  const double T24   = std::sqrt(std::abs((p2-p4).M2()));
+  const double sqrtS = std::sqrt(std::abs((pH+p3).M2()));
+  const double Q     = std::sqrt(std::abs((p1-pH).M2()));
 
-FILL(Hj1_mass,j2_pT)
+  bin_t::id<T24_sqrtS>( T24 < sqrtS ? 1 : 2 );
 
-FILL(sqrtS,T24)
-FILL(Q,T24)
+  FILL(Hj1_mass,j2_pT)
+
+  FILL(sqrtS,T24)
+  FILL(Q,T24)
+}
 
 #endif

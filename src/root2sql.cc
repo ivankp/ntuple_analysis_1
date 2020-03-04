@@ -125,6 +125,7 @@ int main(int argc, char* argv[]) {
   vector<const char*> ifnames;
   vector<string> labels_names;
   const char* ofname;
+  regex hist_re;
 
   try {
     using namespace ivanp::po;
@@ -132,6 +133,8 @@ int main(int argc, char* argv[]) {
       (ifnames,'i',"input ROOT files",req(),pos())
       (ofname,'o',"output sqlite database",req())
       (labels_names,'l',"names of histogram labels")
+      (hist_re,"--hist-regex","matches histogram name tokens\n"
+       "default: [^_]+", default_init("[^_]+"))
       .parse(argc,argv,true)) return 0;
   } catch (const std::exception& e) {
     cerr << e << endl;
@@ -154,7 +157,7 @@ int main(int argc, char* argv[]) {
       return 1;
     }
 
-    y_combinator([](auto f, auto* dir,
+    y_combinator([&](auto f, auto* dir,
       const vector<string>& labels, int depth=0
     ) -> void {
       for (auto& key : get_keys(dir)) {
@@ -188,7 +191,7 @@ int main(int argc, char* argv[]) {
           hist.bins[i*2+1] = h->GetBinError(i);
         }
 
-        auto tokens = h->GetName()/"[^_]+"_re;
+        auto tokens = h->GetName()/hist_re;
         for (auto it=tokens.end()-1, begin=tokens.begin(); it!=begin; ) {
           const auto& t = *it--;
           for (const char* x : {"pT","mass","eta","incl","excl"}) {
