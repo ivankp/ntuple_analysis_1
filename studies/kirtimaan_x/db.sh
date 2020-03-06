@@ -10,7 +10,11 @@
 
 sqlite3 kirtimaan_x.db << SQL
   delete from hist where
-  (swap_45="all" and var1 like "x_%") or
-  (swap_45!="all" and var1 like "Njets_%")
+  (swap_45="all" and ( var1 like "x\\_%" ESCAPE "\\"
+    or var1 in ("s34","s45","t15")
+  )) or
+  (swap_45!="all" and ( var1 like "Njets\\_%" ESCAPE "\\"
+    or var1 in ("s12","t23","x1","x2")
+  ))
 SQL
 
