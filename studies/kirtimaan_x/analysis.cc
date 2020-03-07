@@ -41,6 +41,9 @@ h_(x_4_3_zoom)
 h_(x_5_3_zoom)
 h_(x_6_3_zoom)
 h_(x_7_3_zoom)
+h_(x_8_3_zoom)
+h_(x_9_3_zoom)
+h_(x_10_3_zoom)
 
 h_(x_0_3)
 h_(x_1_3)
@@ -68,7 +71,6 @@ const double mh2 = sq(125.), mt2 = sq(172.3);
 #elif defined(ANALYSIS_LOOP) // =====================================
 
 if (njets < 2) continue; // -----------------------------------------
-bin_t::id<swap_45>(int( swap_45::all ));
 
 const auto x1 = *_x1;
 const auto x2 = *_x2;
@@ -116,13 +118,16 @@ for (bool swap45 : {false,true}) {
   const auto x_5_3 = ssrt(4*mt2 + s12 - s34 + t15);
   const auto x_6_3 = ssrt(4*mt2 + s45 + t15 - t23);
   const auto x_7_3 = ssrt(mh2 - 4*mt2 - s34 + t15 - t23);
-  const auto x_8_3 = ssrt(
-    mh2*(s12*s45 - 2*(s12+s45)*mt2) + mh2*mh2*mt2 + sq(s12-s45)*mt2 );
-  const auto x_9_3 = ssrt(
-    mh2*(2*mt2*(s12-s34+s45+2*t15-t23)+(s12-s34+t15)*(s45+t15-t23))
-    + mh2*mh2*mt2 + mt2*sq(s12-s34-s45+t23) );
-  const auto x_10_3 = ssrt(
-    t15*mh2*mh2 + mt2*sq(s34+t23) - t15*mh2*(4*mt2+s34-t15+t23) );
+  const auto x_8_3 = ssrt((
+      mh2*(s12*s45 - 2*(s12+s45)*mt2) + mh2*mh2*mt2 + sq(s12-s45)*mt2
+    ) / (mh2*mt2) );
+  const auto x_9_3 = ssrt((
+      mh2*(2*mt2*(s12-s34+s45+2*t15-t23)+(s12-s34+t15)*(s45+t15-t23))
+      + mh2*mh2*mt2 + mt2*sq(s12-s34-s45+t23)
+    ) / (mh2*mt2) );
+  const auto x_10_3 = ssrt((
+      t15*mh2*mh2 + mt2*sq(s34+t23) - t15*mh2*(4*mt2+s34-t15+t23)
+    ) / (mh2*mt2) );
 
   FILL(x_0_3)
   FILL(x_1_3)
@@ -144,6 +149,11 @@ for (bool swap45 : {false,true}) {
   h_x_5_3_zoom(x_5_3);
   h_x_6_3_zoom(x_6_3);
   h_x_7_3_zoom(x_7_3);
+  h_x_8_3_zoom(x_8_3);
+  h_x_9_3_zoom(x_9_3);
+  h_x_10_3_zoom(x_10_3);
 }
+
+bin_t::id<swap_45>(int( swap_45::all ));
 
 #endif

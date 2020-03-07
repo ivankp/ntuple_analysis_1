@@ -9,12 +9,25 @@
      var1
 
 sqlite3 kirtimaan_x.db << SQL
-  delete from hist where
-  (swap_45="all" and ( var1 like "x\\_%" ESCAPE "\\"
-    or var1 in ("s34","s45","t15")
-  )) or
-  (swap_45!="all" and ( var1 like "Njets\\_%" ESCAPE "\\"
-    or var1 in ("s12","t23","x1","x2")
-  ))
-SQL
+  DELETE FROM hist WHERE
+    (swap_45="all" AND ( var1 LIKE "x\\_%" ESCAPE "\\"
+      OR var1 IN ("s34","s45","t15")
+    )) OR
+    (swap_45!="all" AND ( var1 LIKE "Njets\\_%" ESCAPE "\\"
+      OR var1 IN ("s12","t23","x1","x2")
+    ));
 
+  CREATE TEMPORARY TABLE temp AS
+    SELECT * FROM hist WHERE swap_45="all";
+  UPDATE temp SET swap_45="no";
+  INSERT INTO hist SELECT * FROM temp;
+  DROP TABLE temp;
+
+  CREATE TEMPORARY TABLE temp AS
+    SELECT * FROM hist WHERE swap_45="all";
+  UPDATE temp SET swap_45="yes";
+  INSERT INTO hist SELECT * FROM temp;
+  DROP TABLE temp;
+
+  DELETE FROM hist WHERE swap_45="all";
+SQL
