@@ -3,7 +3,7 @@
 ../../bin/root2sql \
   -i merged/*.root \
   -o kirtimaan_x.db \
-  --hist-regex='.+' \
+  --hist-regex='^.+$' \
   -l proc type diag jet weight \
      $(sed -n 's/^#define CATEGORIES //p' analysis.cc | sed 's/[()]\+/ /g') \
      var1
@@ -11,10 +11,12 @@
 sqlite3 kirtimaan_x.db << SQL
   DELETE FROM hist WHERE
     (swap_45="all" AND ( var1 LIKE "x\\_%" ESCAPE "\\"
-      OR var1 IN ("s34","s45","t15")
+      OR var1 IN ("s34","s45","t15","t34","t45")
+      OR var1 IN ("sqrt_s34","sqrt_s45","sqrt_t15","sqrt_t34","sqrt_t45")
     )) OR
     (swap_45!="all" AND ( var1 LIKE "Njets\\_%" ESCAPE "\\"
       OR var1 IN ("s12","t23","x1","x2")
+      OR var1 IN ("sqrt_s12","sqrt_t23","x1","x2")
     ));
 
   CREATE TEMPORARY TABLE temp AS
