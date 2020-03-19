@@ -7,7 +7,7 @@
 
 #elif defined(ANALYSIS_GLOBAL) // ===================================
 
-// #include <boost/preprocessor/repetition/repeat.hpp>
+#include <boost/preprocessor/seq/for_each_product.hpp>
 
 MAKE_ENUM(swap_45,(all)(no)(yes))
 
@@ -35,38 +35,25 @@ double ssrt(double x) noexcept {
 
 branch_reader<Double_t> _x1(reader,"x1"), _x2(reader,"x2");
 
-#define REPEAT(r, data, elem) \
-  BOOST_PP_SEQ_ELEM(0,data)(BOOST_PP_CAT(BOOST_PP_CAT( \
-    BOOST_PP_SEQ_ELEM(1,data), elem), BOOST_PP_SEQ_ELEM(2,data) ))
+#define REPEAT_MACRO(r, x) \
+  BOOST_PP_SEQ_ELEM(0,x) ( BOOST_PP_CAT(BOOST_PP_CAT( \
+    BOOST_PP_SEQ_ELEM(1,x), BOOST_PP_SEQ_ELEM(3,x)), BOOST_PP_SEQ_ELEM(2,x) ))
 
-BOOST_PP_SEQ_FOR_EACH( REPEAT, (h_)(x)(), \
-  (1)(2))
+#define REPEAT(SEQ) BOOST_PP_SEQ_FOR_EACH_PRODUCT( REPEAT_MACRO, SEQ )
 
-BOOST_PP_SEQ_FOR_EACH( REPEAT, (h_)(x_)(_3), \
-  (0)(1)(2)(3)(4)(5)(6)(7)(8)(9)(10))
+REPEAT( ((h_))((x))(()) ((1)(2)) )
 
-BOOST_PP_SEQ_FOR_EACH( REPEAT, (h_)(x_)(_3_zoom), \
-  (0)(1)(2)(3)(4)(5)(6)(7)(8)(9)(10))
+REPEAT( ((h_))((s)(sqrt_s))(()) ( (12)(34)(45)(35) ))
+REPEAT( ((h_))((t)(sqrt_t))(()) ( (23)(15)(34)(35)(45) ))
 
-BOOST_PP_SEQ_FOR_EACH( REPEAT, (h_)(x_)(_4), \
-  (0)(1)(2)(3)(4)(5)(6)(7)(8)(9)\
-  (10)(11)(12)(13)(14)(15)(16)(17)(18)(19)\
-  (20)(21)(22)(23)(24)(25)(26)(27)(28)(29)\
-  (30))
+REPEAT( ((h_))((x_3_))(()(_zoom1)) ( \
+  (0)(1)(2)(3)(4)(5)(6)(7)(8)(9)(10) ))
 
-BOOST_PP_SEQ_FOR_EACH( REPEAT, (h_)(s)(), \
-  (12)(34)(45)(35))
-
-BOOST_PP_SEQ_FOR_EACH( REPEAT, (h_)(t)(), \
-  (23)(15)(34)(35)(45))
-
-BOOST_PP_SEQ_FOR_EACH( REPEAT, (h_)(sqrt_s)(), \
-  (12)(34)(45)(35))
-
-BOOST_PP_SEQ_FOR_EACH( REPEAT, (h_)(sqrt_t)(), \
-  (23)(15)(34)(35)(45))
-
-#define FILL_zoom(X1) h_##X1##_zoom(X1);
+REPEAT( ((h_))((x_4_))(()(_zoom1)) ( \
+  (0)(1)(2)(3)(4)(5)(6)(7)(8)(9) \
+  (10)(11)(12)(13)(14)(15)(16)(17)(18)(19) \
+  (20)(21)(22)(23)(24)(25)(26)(27)(28)(29) \
+  (30) ))
 
 const double mh2 = sq(125.), mt2 = sq(172.3);
 
@@ -95,11 +82,11 @@ const auto& j2 = jets[1];
 def_s(1,2)
 def_t(2,3)
 
-FILL(s12)
-FILL(t23)
+#define FILL_sqrt_(X1) h_sqrt_##X1(ssrt(X1));
+#define FILL_sqrt(X1) FILL_sqrt_(X1)
 
-h_sqrt_s12(sqrt(s12));
-h_sqrt_t23(sqrt(t23));
+REPEAT( ((FILL)(FILL_sqrt))((s))(()) ( (12) ))
+REPEAT( ((FILL)(FILL_sqrt))((t))(()) ( (23) ))
 
 for (bool swap45 : {false,true}) {
   bin_t::id<swap_45>(int( swap45 ? swap_45::yes : swap_45::no ));
@@ -115,91 +102,91 @@ for (bool swap45 : {false,true}) {
   def_t(3,5)
   def_t(4,5)
 
-  BOOST_PP_SEQ_FOR_EACH( REPEAT, (FILL)(s)(), \
-    (34)(35)(45))
-  BOOST_PP_SEQ_FOR_EACH( REPEAT, (FILL)(t)(), \
-    (15)(34)(35)(45))
-
-  h_sqrt_s34(ssrt(s34));
-  h_sqrt_s35(ssrt(s35));
-  h_sqrt_s45(ssrt(s45));
-  h_sqrt_t15(ssrt(t15));
-  h_sqrt_t34(ssrt(t34));
-  h_sqrt_t35(ssrt(t35));
-  h_sqrt_t45(ssrt(t45));
+  REPEAT( ((FILL)(FILL_sqrt))((s))(()) (     (34)(35)(45) ))
+  REPEAT( ((FILL)(FILL_sqrt))((t))(()) ( (15)(34)(35)(45) ))
 
   // Triangles
-  const auto x_0_3 = mh2 - 4*mt2 - s12 + s45 - t23;
-  const auto x_1_3 = s34 - 4*mt2;
-  const auto x_2_3 = mh2 - 4*mt2 + s12 - s34 - s45;
+  const auto x_3_0 = mh2 - 4*mt2 - s12 + s45 - t23;
+  const auto x_3_1 = s34 - 4*mt2;
+  const auto x_3_2 = mh2 - 4*mt2 + s12 - s34 - s45;
   const auto x_3_3 = s45 - 4*mt2;
-  const auto x_4_3 = s12 - 4*mt2;
-  const auto x_5_3 = 4*mt2 + s12 - s34 + t15;
-  const auto x_6_3 = 4*mt2 + s45 + t15 - t23;
-  const auto x_7_3 = mh2 - 4*mt2 - s34 + t15 - t23;
-  const auto x_8_3 =
+  const auto x_3_4 = s12 - 4*mt2;
+  const auto x_3_5 = 4*mt2 + s12 - s34 + t15;
+  const auto x_3_6 = 4*mt2 + s45 + t15 - t23;
+  const auto x_3_7 = mh2 - 4*mt2 - s34 + t15 - t23;
+  const auto x_3_8 =
     mh2*(s12*s45 - 2*(s12+s45)*mt2) + mh2*mh2*mt2 + sq(s12-s45)*mt2;
-  const auto x_9_3 =
+  const auto x_3_9 =
     mh2*(2*mt2*(s12-s34+s45+2*t15-t23)+(s12-s34+t15)*(s45+t15-t23))
     + mh2*mh2*mt2 + mt2*sq(s12-s34-s45+t23);
-  const auto x_10_3 =
+  const auto x_3_10 =
     t15*mh2*mh2 + mt2*sq(s34+t23) - t15*mh2*(4*mt2+s34-t15+t23);
 
-  BOOST_PP_SEQ_FOR_EACH( REPEAT, (FILL)(x_)(_3), \
-    (0)(1)(2)(3)(4)(5)(6)(7)(8)(9)(10))
+#define FILL_zoom1_(X1) h_##X1##_zoom1(X1);
+#define FILL_zoom1(X1) FILL_zoom1_(X1)
 
-  BOOST_PP_SEQ_FOR_EACH( REPEAT, (FILL_zoom)(x_)(_3), \
-    (0)(1)(2)(3)(4)(5)(6)(7)(8)(9)(10))
+  REPEAT( ((FILL)(FILL_zoom1))((x_3_))(()) ( \
+    (0)(1)(2)(3)(4)(5)(6)(7)(8)(9)(10) ))
 
   // Boxes Double cut
-  const auto x_0_4 = s12 - 4*mt2;
-  const auto x_1_4 = s34 - 4*mt2;
-  const auto x_2_4 = mh2 - 4*mt2 + s12 - s34 - s45;
-  const auto x_3_4 = s45 - 4*mt2;
+  const auto x_4_0 = s12 - 4*mt2;
+  const auto x_4_1 = s34 - 4*mt2;
+  const auto x_4_2 = mh2 - 4*mt2 + s12 - s34 - s45;
+  const auto x_4_3 = s45 - 4*mt2;
   const auto x_4_4 = 4*mt2 + s45 + t15 - t23;
-  const auto x_5_4 = 4*mt2 - t23;
-  const auto x_6_4 = 4*mt2 + s12 - s34 + t15;
-  const auto x_7_4 = mh2 - 4*mt2 - s12 + s45 - t23;
-  const auto x_8_4 = mh2 - 4*mt2 - s34 + t15 - t23;
-  const auto x_9_4 = -mh2 + 4*mt2 + s12 - s45 + t23;
+  const auto x_4_5 = 4*mt2 - t23;
+  const auto x_4_6 = 4*mt2 + s12 - s34 + t15;
+  const auto x_4_7 = mh2 - 4*mt2 - s12 + s45 - t23;
+  const auto x_4_8 = mh2 - 4*mt2 - s34 + t15 - t23;
+  const auto x_4_9 = -mh2 + 4*mt2 + s12 - s45 + t23;
 
   // Boxes Triple cut
-  const auto x_10_4 = mh2*(s12*s45 - 2*(s12+s45)*mt2)
+  const auto x_4_10 = mh2*(s12*s45 - 2*(s12+s45)*mt2)
                     + mh2*mh2*mt2 + sq(s12-s45)*mt2;
-  const auto x_11_4 = mh2*( 2*mt2*(s12-s34+s45+2*t15-t23)
+  const auto x_4_11 = mh2*( 2*mt2*(s12-s34+s45+2*t15-t23)
                           + (s12-s34+t15)*(s45+t15-t23) )
                     + mh2*mh2*mt2 + mt2*sq(s12-s34-s45+t23);
-  const auto x_12_4 = t15*mh2*mh2 + mt2*sq(s34+t23)
+  const auto x_4_12 = t15*mh2*mh2 + mt2*sq(s34+t23)
                     - t15*mh2*(4*mt2+s34-t15+t23);
 
   // Boxes Quadruple cut
-  const auto x_13_4 = (s12-s34)*(mh2-s34) + s45*(s34-4*mh2);
-  const auto x_14_4 = 4*mt2*(s34-s12)*(mh2-s34) + s34*s45*(s34-4*mt2);
-  const auto x_15_4 = -s45*(mh2*mh2 + sq(-s12+s34+s45))
+  const auto x_4_13 = (s12-s34)*(mh2-s34) + s45*(s34-4*mh2);
+  const auto x_4_14 = 4*mt2*(s34-s12)*(mh2-s34) + s34*s45*(s34-4*mt2);
+  const auto x_4_15 = -s45*(mh2*mh2 + sq(-s12+s34+s45))
                     + 2*mh2*(2*(s12-s34)*mt2 + s45*(-s12+s34+s45))
                     + 4*s34*(-s12+s34+s45)*mt2;
-  const auto x_16_4 = 4*mh2*mt2*(s45+t15)
+  const auto x_4_16 = 4*mh2*mt2*(s45+t15)
                     - t23*(4*(-s12+s34+s45)*mt2 + t23*(s12-s34+t15));
-  const auto x_17_4 = mh2*(s45+t15) - 4*mt2*(s12-s34+t15) + t23*(s12-s34-s45);
-  const auto x_18_4 = mh2*mh2*(s12-s34+t15) // TODO
-  const auto x_19_4 =
-  const auto x_20_4 =
-  const auto x_21_4 =
-  const auto x_22_4 =
-  const auto x_23_4 =
-  const auto x_24_4 =
-  const auto x_25_4 =
-  const auto x_26_4 =
-  const auto x_27_4 =
-  const auto x_28_4 =
-  const auto x_29_4 =
-  const auto x_30_4 =
+  const auto x_4_17 = mh2*(s45+t15) - 4*mt2*(s12-s34+t15) + t23*(s12-s34-s45);
+  const auto x_4_18 = mh2*mh2*(s12-s34+t15)
+                    + 2*mh2*((s12-s34-s45)*(s12-s34+t15)-2*mt2*(s45+t15))
+                    + (s12-s34-s45)*((s12-s34-s45)*(s12-s34+t15)-4*mt2*t23);
+  const auto x_4_19 = 4*mt2*(mh2*t15+(s12-s34-s45)*(s12-s45+t23))
+                    - t15*sq(mh2-s12+s45-t23);
+  const auto x_4_20 = t15*(mh2-4*mt2) + (s12-s34-s45)*(s12-s45+t23);
+  const auto x_4_21 = 4*mt2*(mh2*t15 + (s12-s34-s45)*(s12-s45+t23))
+                    - t15*sq(mh2+s12-s34-s45);
+  const auto x_4_22 = mh2*(4*mt2*t15-t23*t23)
+                    + t23*(t23*(s34-t15+t23)-4*mt2*s34);
+  const auto x_4_23 = mh2*(t15-4*mt2) + 4*mt2*(s34-t15+t23) - s34*t23;
+  const auto x_4_24 = -sq(s34)*(mh2+t15-t23) + 4*mt2*(mh2*t15-s34*t23)
+                    + s34*s34*s34;
+  const auto x_4_25 = sq(mh2)*(s45+t15-t23)
+                    - 2*mh2*(2*mt2*(s12+t15) + (s45+t15-t23)*(s12-s45+t23))
+                    - (s12-s45+t23)*(-4*mt2*s34-(s45+t15-t23)*(s12-s45+t23));
+  const auto x_4_26 = mh2*(s12+t15) - 4*mt2*(s45+t15-t23) - s34*(s12-s45+t23);
+  const auto x_4_27 = 4*mh2*mt2*(s12+t15)
+                    + s34*(-4*mt2*(s12-s45+t23)-s34*(s45+t15-t23));
+  const auto x_4_28 = mh2*mh2*s12 + (s12-s45+t23)*(s12*(s12-s45+t23)-4*mt2*t23)
+                    - 2*mh2*(2*mt2*(s45-t23)+s12*(s12-s45+t23));
+  const auto x_4_29 = 4*mh2*mt2*(t23-s45) + t23*(s12*t23-4*mt2*(s12-s45+t23));
+  const auto x_4_30 = mh2*(s45-t23) - 4*mt2*s12 + t23*(s12-s45+t23);
 
-  BOOST_PP_SEQ_FOR_EACH( REPEAT, (FILL)(x_)(_4), \
-    (0)(1)(2)(3)(4)(5)(6)(7)(8)(9)\
-    (10)(11)(12)(13)(14)(15)(16)(17)(18)(19)\
-    (20)(21)(22)(23)(24)(25)(26)(27)(28)(29)\
-    (30))
+  REPEAT( ((FILL)(FILL_zoom1))((x_4_))(()) ( \
+    (0)(1)(2)(3)(4)(5)(6)(7)(8)(9) \
+    (10)(11)(12)(13)(14)(15)(16)(17)(18)(19) \
+    (20)(21)(22)(23)(24)(25)(26)(27)(28)(29) \
+    (30) ))
 }
 
 bin_t::id<swap_45>(int( swap_45::all ));
