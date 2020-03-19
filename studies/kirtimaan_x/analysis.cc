@@ -43,13 +43,13 @@ branch_reader<Double_t> _x1(reader,"x1"), _x2(reader,"x2");
 
 REPEAT( ((h_))((x))(()) ((1)(2)) )
 
-REPEAT( ((h_))((s)(sqrt_s))(()) ( (12)(34)(45)(35) ))
-REPEAT( ((h_))((t)(sqrt_t))(()) ( (23)(15)(34)(35)(45) ))
+REPEAT( ((h_))((s)(sqrt_s))(()(_zoom1)(_zoom2)) ( (12)(34)(45)(35) ))
+REPEAT( ((h_))((t)(sqrt_t))(()(_zoom1)(_zoom2)) ( (23)(15)(34)(35)(45) ))
 
-REPEAT( ((h_))((x_3_))(()(_zoom1)) ( \
+REPEAT( ((h_))((x_3_))(()(_zoom1)(_zoom2)) ( \
   (0)(1)(2)(3)(4)(5)(6)(7)(8)(9)(10) ))
 
-REPEAT( ((h_))((x_4_))(()(_zoom1)) ( \
+REPEAT( ((h_))((x_4_))(()(_zoom1)(_zoom2)) ( \
   (0)(1)(2)(3)(4)(5)(6)(7)(8)(9) \
   (10)(11)(12)(13)(14)(15)(16)(17)(18)(19) \
   (20)(21)(22)(23)(24)(25)(26)(27)(28)(29) \
@@ -76,17 +76,24 @@ const auto& k3 = higgs;
 const auto& j1 = jets[0];
 const auto& j2 = jets[1];
 
-#define def_s(i,j) const auto s##i##j = norm2(k##i + k##j);
-#define def_t(i,j) const auto t##i##j = norm2(k##i - k##j);
+#define def_s(i,j) \
+  const auto s##i##j = norm2(k##i + k##j); \
+  const auto sqrt_s##i##j = ssrt(s##i##j);
+#define def_t(i,j) \
+  const auto t##i##j = norm2(k##i - k##j); \
+  const auto sqrt_t##i##j = ssrt(t##i##j);
 
 def_s(1,2)
 def_t(2,3)
 
-#define FILL_sqrt_(X1) h_sqrt_##X1(ssrt(X1));
-#define FILL_sqrt(X1) FILL_sqrt_(X1)
+#define FILL_zoom1_(X1) h_##X1##_zoom1(X1);
+#define FILL_zoom1(X1) FILL_zoom1_(X1)
 
-REPEAT( ((FILL)(FILL_sqrt))((s))(()) ( (12) ))
-REPEAT( ((FILL)(FILL_sqrt))((t))(()) ( (23) ))
+#define FILL_zoom2_(X1) h_##X1##_zoom2(X1);
+#define FILL_zoom2(X1) FILL_zoom2_(X1)
+
+REPEAT( ( (FILL)(FILL_zoom1)(FILL_zoom2) )((s)(sqrt_s))(())( (12) ))
+REPEAT( ( (FILL)(FILL_zoom1)(FILL_zoom2) )((t)(sqrt_t))(())( (23) ))
 
 for (bool swap45 : {false,true}) {
   bin_t::id<swap_45>(int( swap45 ? swap_45::yes : swap_45::no ));
@@ -102,8 +109,10 @@ for (bool swap45 : {false,true}) {
   def_t(3,5)
   def_t(4,5)
 
-  REPEAT( ((FILL)(FILL_sqrt))((s))(()) (     (34)(35)(45) ))
-  REPEAT( ((FILL)(FILL_sqrt))((t))(()) ( (15)(34)(35)(45) ))
+  REPEAT( ( (FILL)(FILL_zoom1)(FILL_zoom2) )((s)(sqrt_s))(())( \
+        (34)(35)(45) ))
+  REPEAT( ( (FILL)(FILL_zoom1)(FILL_zoom2) )((t)(sqrt_t))(())( \
+    (15)(34)(35)(45) ))
 
   // Triangles
   const auto x_3_0 = mh2 - 4*mt2 - s12 + s45 - t23;
@@ -122,10 +131,7 @@ for (bool swap45 : {false,true}) {
   const auto x_3_10 =
     t15*mh2*mh2 + mt2*sq(s34+t23) - t15*mh2*(4*mt2+s34-t15+t23);
 
-#define FILL_zoom1_(X1) h_##X1##_zoom1(X1);
-#define FILL_zoom1(X1) FILL_zoom1_(X1)
-
-  REPEAT( ((FILL)(FILL_zoom1))((x_3_))(()) ( \
+  REPEAT( ((FILL)(FILL_zoom1)(FILL_zoom2))((x_3_))(()) ( \
     (0)(1)(2)(3)(4)(5)(6)(7)(8)(9)(10) ))
 
   // Boxes Double cut
@@ -182,7 +188,7 @@ for (bool swap45 : {false,true}) {
   const auto x_4_29 = 4*mh2*mt2*(t23-s45) + t23*(s12*t23-4*mt2*(s12-s45+t23));
   const auto x_4_30 = mh2*(s45-t23) - 4*mt2*s12 + t23*(s12-s45+t23);
 
-  REPEAT( ((FILL)(FILL_zoom1))((x_4_))(()) ( \
+  REPEAT( ((FILL)(FILL_zoom1)(FILL_zoom2))((x_4_))(()) ( \
     (0)(1)(2)(3)(4)(5)(6)(7)(8)(9) \
     (10)(11)(12)(13)(14)(15)(16)(17)(18)(19) \
     (20)(21)(22)(23)(24)(25)(26)(27)(28)(29) \
