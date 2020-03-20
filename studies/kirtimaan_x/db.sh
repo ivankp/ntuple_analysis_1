@@ -15,14 +15,13 @@ rm -fv kirtimaan_x.db
 sqlite3 kirtimaan_x.db << SQL
   DELETE FROM hist WHERE
     (swap_45="all" AND ( var1 LIKE "x\\_%" ESCAPE "\\"
-      OR var1 IN ("s34","s35","s45",
-            "t15","t34","t35","t45")
-      OR var1 IN ("sqrt_s34","sqrt_s35","sqrt_s45",
-       "sqrt_t15","sqrt_t34","sqrt_t35","sqrt_t45")
+      OR var1 IN ( "s34","s35","s45",
+             "t15","t34","t35","t45",
+                   "sqrt_s34","sqrt_s35","sqrt_s45",
+        "sqrt_t15","sqrt_t34","sqrt_t35","sqrt_t45")
     )) OR
     (swap_45!="all" AND ( var1 LIKE "Njets\\_%" ESCAPE "\\"
-      OR var1 IN ("s12","t23","x1","x2")
-      OR var1 IN ("sqrt_s12","sqrt_t23","x1","x2")
+      OR var1 IN ("x1","x2", "s12","t23", "sqrt_s12","sqrt_t23")
     ));
 
   CREATE TEMPORARY TABLE temp AS
