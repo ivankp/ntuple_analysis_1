@@ -27,6 +27,7 @@ double angle(const TLorentzVector& a, const TLorentzVector& b) {
 
 branch_reader<Double_t> _x1(reader,"x1"), _x2(reader,"x2");
 
+h_(Hj1_mass)
 h_(Hj1_mass,j2_pT)
 h_(sqrtS,T24)
 h_(Q,T24)
@@ -70,6 +71,7 @@ for (bool swap34 : {false,true}) {
 
   bin_t::id<T24_sqrtS>( T24 < sqrtS ? 1 : 2 );
 
+  FILL(Hj1_mass)
   FILL(Hj1_mass,j2_pT)
 
   FILL(sqrtS,T24)
