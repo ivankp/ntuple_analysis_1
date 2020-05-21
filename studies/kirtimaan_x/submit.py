@@ -3,6 +3,7 @@
 import sys, os, sqlite3, json, re
 from subprocess import Popen, PIPE
 from collections import defaultdict
+from itertools import product
 
 def mkdirs(*ds):
     for d in ds:
@@ -16,18 +17,13 @@ project_dir = loc
 while os.path.basename(project_dir) != 'ntuple_analysis':
     project_dir = os.path.dirname(project_dir)
 
-# if len(sys.argv) < 2:
-#     print "usage:", sys.argv[0], "njets"
-#     sys.exit()
-njets = 2
 jetR = 4
 
 chunk_size = 20e6
 
 mkdirs(loc+'/condor',loc+'/out')
 
-db  = sqlite3.connect(project_dir+'/sql/ntuples.db')
-cur = db.cursor()
+db = sqlite3.connect(project_dir+'/sql/ntuples.db')
 
 LD_LIBRARY_PATH = os.environ['LD_LIBRARY_PATH']
 
@@ -38,20 +34,22 @@ def diagram(info):
         return m.group(1)
     return 'all'
 
-def get(info):
-    cur.execute('''
-SELECT dir,file,particle,njets,part,info,nentries
+def get(names,vals):
+    fs = [ ( x[-1], x[0]+'/'+x[1], x[3],
+        '{}{}j{}_{:g}TeV_{}_{}_antikt{:g}'.format(
+            x[2], x[3], x[4],
+            x[5],
+            ('mtop' if ('mtop' in x[6]) else 'eft'),
+            diagram(x[6]),
+            jetR
+        )
+    ) for x in db.execute('''
+SELECT dir,file,particle,njets,part,energy,info,nentries
 FROM ntuples
-WHERE njets=? and info=? and part=?
-and (particle="H" or particle="AA") and energy=13
-''',(njets,info[0],info[1]))
-    fs = [ ( x[-1], x[0]+'/'+x[1], '{}{}j{}_{}_{}_antikt{:g}'.format(
-        x[2], x[3], x[4],
-        ('mtop' if ('mtop' in x[5]) else 'eft'),
-        diagram(x[5]),
-        jetR
-    )) for x in cur.fetchall() ]
-    pref = set([x[2] for x in fs])
+WHERE
+'''+' and '.join(a+'=?' for a in names),vals).fetchall() ]
+
+    pref = set([f[-1] for f in fs])
     if len(pref) > 1:
         raise Exception('multiple types in single selection: '+' '.join(pref))
     elif len(pref)==0:
@@ -63,7 +61,7 @@ and (particle="H" or particle="AA") and energy=13
     for x in fs:
         if n == 0:
             subcount[pref] += 1
-            chunks.append(('{}_{:0>3d}'.format(pref,subcount[pref]),[]))
+            chunks.append(('{}_{:0>3d}'.format(pref,subcount[pref]),[],x[2]))
         chunks[-1][1].append(x[1])
         n += x[0]
         if n >= chunk_size:
@@ -89,7 +87,7 @@ CARD
             'jets': {
                 "cuts": { "pT": 30, "eta": 4.4 },
                 "alg": [ "antikt", jetR*0.1 ],
-                "njets_min": njets
+                "njets_min": chunk[2]
             },
             'binning': loc+'/analysis.bins'
         },
@@ -107,31 +105,34 @@ getenv = True
 Queue
 '''.format(chunk[0])
 
-def jobs(*infos):
-    for info in infos:
-        for chunk in get(info):
-            print chunk[0]
-            yield condor(chunk)
-
 os.chdir(loc+'/condor')
 
-for part in ('B'):
-    for job in jobs(
-        # ('GGFHT pt25.0 eta4.5',part),
-        # ('mtop GGFHT pt25.0 eta4.5',part),
+params = zip(
+    ('njets',(2,)),
+    ('part',('B',)),
+    ('particle',('H','AA')),
+    ('energy',(13,100)),
+    ('info',(
+        'Nico',
+        'ED GGFHT pt25.0 eta4.5',
+        'mtop GGFHT pt25.0 eta4.5',
+        'mtop amegic_GGFHT pt25.0 eta4.5',
+        'amegic_GGFHT pt25.0 eta4.5 mtop tr',
+        'amegic_GGFHT pt25.0 eta4.5 mtop bx',
+        'amegic_GGFHT pt25.0 eta4.5 mtop pn',
+        'eos GGFHT pt25.0 eta4.5',
+        'eos GGFHT pt25.0 eta10.0',
+        'eos amegic_GGFHT pt25.0 eta10.0',
+        'eos mtop GGFHT_FCC pt25.0 eta10.0'
+    ))
+)
+for vals in product(*params[1]):
+    for chunk in get(params[0],vals):
+        print chunk[0]
+        job = condor(chunk)
 
-        ('Nico',part),
-        ('ED GGFHT pt25.0 eta4.5',part),
-        ('mtop GGFHT pt25.0 eta4.5',part),
-        ('mtop amegic_GGFHT pt25.0 eta4.5',part),
-
-        ('amegic_GGFHT pt25.0 eta4.5 mtop tr',part),
-        ('amegic_GGFHT pt25.0 eta4.5 mtop bx',part),
-        ('amegic_GGFHT pt25.0 eta4.5 mtop pn',part)
-    ):
         p = Popen(('condor_submit','-'), stdin=PIPE, stdout=PIPE)
         p.stdin.write(job)
         p.communicate()
         p.stdin.close()
-        # pass
 

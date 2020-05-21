@@ -6,7 +6,7 @@ rm -fv kirtimaan_x.db
   -i merged/*.root \
   -o kirtimaan_x.db \
   --hist-regex='.+(?=_zoom\d*$)|zoom\d*|(?!_zoom\d*).+' \
-  -l proc type diag jet weight \
+  -l proc energy type diag jet weight \
      $(sed -n 's/^#define CATEGORIES //p' analysis.cc | sed 's/[()]\+/ /g') \
      var1 zoom
 
