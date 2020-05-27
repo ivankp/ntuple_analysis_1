@@ -1,0 +1,7 @@
+*.db
+*.d
+
+condor/
+merged/
+out
+
