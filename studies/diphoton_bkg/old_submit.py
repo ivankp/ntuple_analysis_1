@@ -19,11 +19,12 @@ while os.path.basename(project_dir) != 'ntuple_analysis':
 
 jetR = 4
 
-chunk_size = 20e6
+chunk_size = 50e6
 
 mkdirs(loc+'/condor',loc+'/out')
 
-db = sqlite3.connect(project_dir+'/sql/ntuples.db')
+db  = sqlite3.connect(project_dir+'/sql/ntuples.db')
+cur = db.cursor()
 
 LD_LIBRARY_PATH = os.environ['LD_LIBRARY_PATH']
 
@@ -35,21 +36,20 @@ def diagram(info):
     return 'all'
 
 def get(names,vals):
-    fs = [ ( x[-1], x[0]+'/'+x[1], x[3],
-        '{}{}j{}_{:g}TeV_{}_{}_antikt{:g}'.format(
-            x[2], x[3], x[4],
-            x[5],
-            ('mtop' if ('mtop' in x[6]) else 'eft'),
-            diagram(x[6]),
-            jetR
-        )
-    ) for x in db.execute('''
-SELECT dir,file,particle,njets,part,energy,info,nentries
+    cur.execute('''
+SELECT dir,file,particle,njets,part,info,nentries
 FROM ntuples
 WHERE
-'''+' and '.join(a+'=?' for a in names),vals).fetchall() ]
-
-    pref = set([f[-1] for f in fs])
+'''+' and '.join(a+'=?' for a in names),vals)
+    fs = [ ( x[-1], x[0]+'/'+x[1], x[3],
+        '{}{}j{}_{}_{}_antikt{:g}'.format(
+            x[2], x[3], x[4],
+            ('mtop' if ('mtop' in x[5]) else 'eft'),
+            diagram(x[5]),
+            jetR
+        )
+    ) for x in cur.fetchall() ]
+    pref = set([x[-1] for x in fs])
     if len(pref) > 1:
         raise Exception('multiple types in single selection: '+' '.join(pref))
     elif len(pref)==0:
@@ -89,7 +89,7 @@ CARD
                 "alg": [ "antikt", jetR*0.1 ],
                 "njets_min": chunk[2]
             },
-            'binning': loc+'/100.bins'
+            'binning': loc+'/analysis.bins'
         },
         'output': loc+'/out/'+chunk[0]+'.root'
     }, indent=2, separators=(',',': ')) ))
@@ -108,23 +108,10 @@ Queue
 os.chdir(loc+'/condor')
 
 params = zip(
-    ('njets',(2,)),
-    ('part',('B',)),
-    ('particle',('H','AA')),
-    ('energy',(13,100)),
-    ('info',(
-        'Nico',
-        'ED GGFHT pt25.0 eta4.5',
-        'mtop GGFHT pt25.0 eta4.5',
-        'mtop amegic_GGFHT pt25.0 eta4.5',
-        'amegic_GGFHT pt25.0 eta4.5 mtop tr',
-        'amegic_GGFHT pt25.0 eta4.5 mtop bx',
-        'amegic_GGFHT pt25.0 eta4.5 mtop pn',
-        'eos GGFHT pt25.0 eta4.5',
-        'eos GGFHT pt25.0 eta10.0',
-        'eos amegic_GGFHT pt25.0 eta10.0',
-        'eos mtop GGFHT_FCC pt25.0 eta10.0'
-    ))
+    ('njets',(1,2)),
+    ('part',('B','RS','I','V')),
+    ('particle',('AA',)),
+    ('energy',(13,))
 )
 for vals in product(*params[1]):
     for chunk in get(params[0],vals):

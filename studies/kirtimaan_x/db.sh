@@ -4,7 +4,7 @@ rm -fv kirtimaan_x.db
 
 ../../bin/root2sql \
   -i merged/*.root \
-  -o kirtimaan_x.db \
+  -o kirtimaan_x_100.db \
   --hist-regex='.+(?=_zoom\d*$)|zoom\d*|(?!_zoom\d*).+' \
   -l proc energy type diag jet weight \
      $(sed -n 's/^#define CATEGORIES //p' analysis.cc | sed 's/[()]\+/ /g') \

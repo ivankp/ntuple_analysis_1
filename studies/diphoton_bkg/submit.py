@@ -23,8 +23,7 @@ chunk_size = 50e6
 
 mkdirs(loc+'/condor',loc+'/out')
 
-db  = sqlite3.connect(project_dir+'/sql/ntuples.db')
-cur = db.cursor()
+db = sqlite3.connect(project_dir+'/sql/ntuples.db')
 
 LD_LIBRARY_PATH = os.environ['LD_LIBRARY_PATH']
 
@@ -36,20 +35,21 @@ def diagram(info):
     return 'all'
 
 def get(names,vals):
-    cur.execute('''
-SELECT dir,file,particle,njets,part,info,nentries
-FROM ntuples
-WHERE
-'''+' and '.join(a+'=?' for a in names),vals)
     fs = [ ( x[-1], x[0]+'/'+x[1], x[3],
-        '{}{}j{}_{}_{}_antikt{:g}'.format(
+        '{}{}j{}_{:g}TeV_{}_{}_antikt{:g}'.format(
             x[2], x[3], x[4],
-            ('mtop' if ('mtop' in x[5]) else 'eft'),
-            diagram(x[5]),
+            x[5],
+            ('mtop' if ('mtop' in x[6]) else 'eft'),
+            diagram(x[6]),
             jetR
         )
-    ) for x in cur.fetchall() ]
-    pref = set([x[-1] for x in fs])
+    ) for x in db.execute('''
+SELECT dir,file,particle,njets,part,energy,info,nentries
+FROM ntuples
+WHERE
+'''+' and '.join(a+'=?' for a in names),vals).fetchall() ]
+
+    pref = set([f[-1] for f in fs])
     if len(pref) > 1:
         raise Exception('multiple types in single selection: '+' '.join(pref))
     elif len(pref)==0:
@@ -108,18 +108,65 @@ Queue
 os.chdir(loc+'/condor')
 
 params = zip(
-    ('njets',(1,2)),
+    ('njets',(1,2,3)),
     ('part',('B','RS','I','V')),
-    ('particle',('AA',)),
-    ('energy',(13,))
+    ('particle',('H','AA')),
+    ('energy',(8,13,100))
 )
-for vals in product(*params[1]):
-    for chunk in get(params[0],vals):
-        print chunk[0]
-        job = condor(chunk)
 
-        p = Popen(('condor_submit','-'), stdin=PIPE, stdout=PIPE)
-        p.stdin.write(job)
-        p.communicate()
-        p.stdin.close()
+infos = [
+    ({ 'particle': 'H', 'energy': 8 },
+     [ 'GGFHT pt25.0 eta4.5' ]),
+
+    ({ 'njets': 1, 'particle': 'H', 'energy': 13 },
+     [ 'GGFHT pt25.0 eta4.5', 'mtop GGFHT pt25.0 eta4.5',
+       'amegic_GGFHT pt25.0 eta4.5 mtop tr',
+       'amegic_GGFHT pt25.0 eta4.5 mtop bx' ]),
+
+    ({ 'njets': 2, 'particle': 'H', 'energy': 13 },
+     [ 'ED GGFHT pt25.0 eta4.5', 'mtop GGFHT pt25.0 eta4.5',
+       'amegic_GGFHT pt25.0 eta4.5 mtop tr',
+       'amegic_GGFHT pt25.0 eta4.5 mtop bx',
+       'amegic_GGFHT pt25.0 eta4.5 mtop pn' ]),
+
+    ({ 'njets': 3, 'particle': 'H', 'energy': 13 },
+     [ 'ED GGFHT pt25.0 eta4.5', 'mtop GGFHT pt25.0 eta4.5' ]),
+
+    ({ 'particle': 'H', 'energy': 100, 'njets': 1 },
+     [ 'eos amegic_GGFHT pt25.0 eta10.0', 'eos GGFHT pt25.0 eta10.0',
+       'eos mtop amegic_GGFHT pt25.0 eta10.0' ]),
+
+    ({ 'particle': 'H', 'energy': 100, 'njets': 2 },
+     [ 'eos amegic_GGFHT pt25.0 eta10.0', 'eos GGFHT pt25.0 eta10.0',
+       'eos mtop GGFHT_FCC pt25.0 eta10.0' ]),
+
+    ({ 'particle': 'H', 'energy': 100, 'njets': 2 },
+     [ 'eos GGFHT pt25.0 eta4.5' ]),
+
+    ({ 'particle': 'AA', 'energy': 13 },
+     [ 'Nico' ])
+]
+
+for vals in product(*params[1]):
+    for info_key, info in infos:
+        matched = True
+        for key, val in zip(params[0],vals):
+            val2 = info_key.get(key)
+            if val2 is not None and val2 != val:
+                matched = False
+                break
+        if matched:
+            for x in info:
+                for chunk in get(params[0]+('info',),vals+(x,)):
+                    outf = loc + '/condor/' + chunk[0] + '.out'
+                    if os.path.exists(outf):
+                        continue
+
+                    print chunk[0]
+                    job = condor(chunk)
+
+                    p = Popen(('condor_submit','-'), stdin=PIPE, stdout=PIPE)
+                    p.stdin.write(job)
+                    p.communicate()
+                    p.stdin.close()
 
