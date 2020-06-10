@@ -35,7 +35,7 @@ def diagram(info):
     return 'all'
 
 def get(names,vals):
-    fs = [ ( x[-1], x[0]+'/'+x[1], x[3],
+    fs = [ ( x[-1], x[0]+'/'+x[1], x[3], x[5],
         '{}{}j{}_{:g}TeV_{}_{}_antikt{:g}'.format(
             x[2], x[3], x[4],
             x[5],
@@ -58,12 +58,14 @@ WHERE
 
     chunks = [ ]
     n = 0
-    for x in fs:
+    for f in fs:
         if n == 0:
             subcount[pref] += 1
-            chunks.append(('{}_{:0>3d}'.format(pref,subcount[pref]),[],x[2]))
-        chunks[-1][1].append(x[1])
-        n += x[0]
+            chunks.append((
+                '{}_{:0>3d}'.format(pref,subcount[pref]), [], f[3], f[2]
+            ))
+        chunks[-1][1].append(f[1])
+        n += f[0]
         if n >= chunk_size:
             n = 0
 
@@ -84,10 +86,11 @@ CARD
     card = json.dumps({
         'input': [{ 'files': chunk[1] }],
         'analysis': {
+            'rootS': chunk[2],
             'jets': {
                 "cuts": { "pT": 30, "eta": 4.4 },
                 "alg": [ "antikt", jetR*0.1 ],
-                "njets_min": chunk[2]
+                "njets_min": chunk[3]
             },
             'binning': loc+'/100.bins'
         },
@@ -107,7 +110,7 @@ Queue
 
 os.chdir(loc+'/condor')
 
-params = zip(
+params = list(zip(
     ('njets',(2,)),
     ('part',('B',)),
     ('particle',('H','AA')),
@@ -125,14 +128,14 @@ params = zip(
         'eos amegic_GGFHT pt25.0 eta10.0',
         'eos mtop GGFHT_FCC pt25.0 eta10.0'
     ))
-)
+))
 for vals in product(*params[1]):
     for chunk in get(params[0],vals):
-        print chunk[0]
+        print(chunk[0])
         job = condor(chunk)
 
-        p = Popen(('condor_submit','-'), stdin=PIPE, stdout=PIPE)
-        p.stdin.write(job)
-        p.communicate()
-        p.stdin.close()
+        # p = Popen(('condor_submit','-'), stdin=PIPE, stdout=PIPE)
+        # p.stdin.write(job)
+        # p.communicate()
+        # p.stdin.close()
 

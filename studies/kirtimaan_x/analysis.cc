@@ -57,6 +57,11 @@ REPEAT( ((h_))((x_4_))(()(_zoom1)(_zoom2)) ( \
 
 const double mh2 = sq(125.), mt2 = sq(172.3);
 
+cout << runcards << endl;
+const double rS = runcards["/analysis/rootS"_jp];
+const double beam_E = rS*500;
+TEST(beam_E)
+
 #elif defined(ANALYSIS_LOOP) // =====================================
 
 if (njets < 2) continue; // -----------------------------------------
@@ -67,8 +72,8 @@ const auto x2 = *_x2;
 FILL(x1);
 FILL(x2);
 
-const double E1 = 6500. * x1;
-const double E2 = 6500. * x2;
+const double E1 = beam_E * x1;
+const double E2 = beam_E * x2;
 
 const auto& k1 = TLorentzVector(0,0,E1,E1);
 const auto& k2 = TLorentzVector(0,0,-E2,E2);

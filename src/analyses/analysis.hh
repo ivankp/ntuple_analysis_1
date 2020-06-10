@@ -40,6 +40,9 @@ using std::endl;
 using std::string;
 using std::vector;
 using ivanp::cat;
+using ivanp::branch_reader;
+using ivanp::float_reader;
+using ivanp::floats_reader;
 
 inline nlohmann::json::json_pointer operator "" _jp(const char* s, size_t n) {
   return nlohmann::json::json_pointer(string(s,n));
@@ -213,7 +216,7 @@ int main(int argc, char* argv[]) {
   TTreeReader reader(&chain);
 
   // Make weight readers
-  vector<float_reader> _weights;
+  vector<ivanp::float_reader> _weights;
   _weights.reserve(weights_names.size());
   for (const auto& name : weights_names) {
     _weights.emplace_back(reader,name.c_str());

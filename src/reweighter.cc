@@ -15,10 +15,12 @@
   std::cout << "\033[36m" #var "\033[0m = " << var << std::endl;
 
 using boost::optional;
+using ivanp::branch_reader;
+using ivanp::float_reader;
 
 struct event {
   branch_reader<Int_t> nparticle;
-  branch_reader<Double_t[],Float_t> px, py, pz, E;
+  branch_reader<Double_t[],Float_t[]> px, py, pz, E;
   branch_reader<Int_t[]> kf;
   branch_reader<Double_t> alphas;
   branch_reader<Double_t> weight2;
@@ -66,7 +68,7 @@ make_pdfs(const std::string& name, bool variations) {
   } else {
     std::vector<std::unique_ptr<LHAPDF::PDF>> pdfs;
     pdfs.emplace_back( LHAPDF::mkPDF(name) );
-    return std::move(pdfs);
+    return pdfs;
   }
 }
 
