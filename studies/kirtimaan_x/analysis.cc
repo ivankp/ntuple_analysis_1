@@ -57,10 +57,8 @@ REPEAT( ((h_))((x_4_))(()(_zoom1)(_zoom2)) ( \
 
 const double mh2 = sq(125.), mt2 = sq(172.3);
 
-cout << runcards << endl;
 const double rS = runcards["/analysis/rootS"_jp];
 const double beam_E = rS*500;
-TEST(beam_E)
 
 #elif defined(ANALYSIS_LOOP) // =====================================
 

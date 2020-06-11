@@ -134,8 +134,8 @@ for vals in product(*params[1]):
         print(chunk[0])
         job = condor(chunk)
 
-        # p = Popen(('condor_submit','-'), stdin=PIPE, stdout=PIPE)
-        # p.stdin.write(job)
-        # p.communicate()
-        # p.stdin.close()
+        p = Popen(('condor_submit','-'), stdin=PIPE, stdout=PIPE)
+        p.stdin.write(job.encode())
+        p.communicate()
+        p.stdin.close()
 
