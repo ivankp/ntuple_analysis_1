@@ -43,7 +43,7 @@ struct nlo_bin<T,std::enable_if_t<std::is_arithmetic<T>::value>>
     else {
       id = current_id;
       w2 += wtmp*wtmp;
-      ++wtmp;
+      wtmp = 1;
     }
     ++w;
     ++n;
